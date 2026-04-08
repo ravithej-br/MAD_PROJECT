@@ -1,0 +1,61 @@
+# TASK HUB - Project Structure Guide
+
+After the completion of the project, the Task Hub application follows a clean, highly organized, and modular folder structure. This ensures that the codebase is scalable, maintainable, and easy for any developer to understand.
+
+Below is the complete architectural breakdown of the project:
+
+```text
+taskhub/
+│
+├── assets/                  # Contains static assets like images, icons, and fonts used across the app.
+│
+├── src/                     # The core directory containing all the application's source code.
+│   │
+│   ├── components/          # REUSABLE UI COMPONENTS
+│   │   └── TaskCard.js      # A generic task display card used by both posters and runners in lists.
+│   │
+│   ├── config/              # CONFIGURATION FILES
+│   │   └── firebase.js      # Initializes the connection to Firebase (Authentication and Firestore database).
+│   │
+│   ├── navigation/          # APP ROUTING & NAVIGATION
+│   │   └── AppNavigator.js  # The central router. Controls whether to show the Auth flow (Login/Signup), or the Main App tabs based on the user's role (Poster vs. Runner).
+│   │
+│   ├── screens/             # UI SCREENS (Grouped by feature and user role)
+│   │   │
+│   │   ├── auth/            # Authentication Flow
+│   │   │   ├── LoginScreen.js      # Sign in to an existing account.
+│   │   │   ├── SignupScreen.js     # Register a new account and choose a role.
+│   │   │   └── SplashScreen.js     # Loading screen shown while checking session state.
+│   │   │
+│   │   ├── poster/          # Task Poster Specific Screens
+│   │   │   ├── PosterHomeScreen.js # The Poster's dashboard showing stats and their posted tasks (List + Map).
+│   │   │   └── PostTaskScreen.js   # Multi-step form to create a new task and drop a location pin.
+│   │   │
+│   │   ├── runner/          # Task Runner Specific Screens
+│   │   │   ├── RunnerHomeScreen.js # The Runner's live map/list of available local tasks to accept.
+│   │   │   └── RunnerMyJobsScreen.js # History of jobs the Runner has accepted, completed, or are pending approval.
+│   │   │
+│   │   └── shared/          # Screens shared by both roles
+│   │       ├── ProfileScreen.js    # Displays user statistics, earnings (if runner), and handles logout.
+│   │       └── TaskDetailScreen.js # Deep-dive view of a single task. Contains live ETA tracking, map routing, action buttons (Accept/Complete/Approve), and rating functionality.
+│   │
+│   ├── store/               # GLOBAL STATE MANAGEMENT
+│   │   └── useAuthStore.js  # Zustand store that manages the user's active session, UID, and role throughout the app without prop-drilling.
+│   │
+│   └── utils/               # HELPER UTILITIES & CONSTANTS
+│       └── theme.js         # Centralized design system defining global brand colors (COLORS.primary, COLORS.success, etc.).
+│
+├── App.js                   # THE ENTRY POINT
+│                            # Wraps the entire application in Gesture/Safe-Area providers and loads the AppNavigator. Global warnings are also disabled here.
+│
+├── app.json                 # EXPO CONFIGURATION
+│                            # Defines the app's name, slug, version, orientation, and native device permissions (like GPS).
+│
+└── package.json             # NODE DEPENDENCIES
+                             # Lists all installed libraries (React Native, Firebase, Expo, Zustand, React Navigation) and CLI scripts.
+```
+
+## Why this structure?
+1. **Separation of Concerns**: Screens are isolated from configurations and components.
+2. **Role-Based Grouping**: By splitting screens into `poster`, `runner`, and `auth`, it is instantly obvious which files are responsible for which user experience.
+3. **Scalability**: If you decide to add an entirely new feature (like Chat or Payments in the future), you can easily add a new folder inside `src/screens/` and logic inside `src/utils/` without cluttering the existing code.
