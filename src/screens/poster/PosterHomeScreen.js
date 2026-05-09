@@ -49,17 +49,19 @@ export default function PosterHomeScreen({ navigation }) {
         if (!user) return;
         const q = query(
             collection(db, 'tasks'),
-            where('posterId', '==', user.uid),
-            orderBy('createdAt', 'desc')
+            where('posterId', '==', user.uid)
         );
 
         const unsub = onSnapshot(q, (snap) => {
             const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            // Sort in memory to avoid index requirements
+            list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setMyTasks(list);
             setLoading(false);
             setRefreshing(false);
         }, (err) => {
             console.error("Firestore Error:", err);
+            showAlert('Database Error', 'Could not fetch your tasks. Check your internet or database permissions.');
             setLoading(false);
             setRefreshing(false);
         });

@@ -7,7 +7,7 @@
  * Calculates Haversine distance between two coordinates.
  * Returns formatted string (e.g. "500m" or "2.5km").
  */
-export function getDistance(loc1, loc2) {
+export function getDistance(loc1, loc2, raw = false) {
     if (!loc1 || !loc2) return null;
     const R = 6371; // Earth's radius in km
     const dLat = (loc2.latitude - loc1.latitude) * Math.PI / 180;
@@ -17,8 +17,11 @@ export function getDistance(loc1, loc2) {
         Math.cos(loc2.latitude * Math.PI / 180) *
         Math.sin(dLon / 2) ** 2;
     const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    
+    if (raw) return dist;
     return dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`;
 }
+
 
 /**
  * Calculates estimated time of arrival based on distance.

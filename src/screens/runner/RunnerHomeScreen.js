@@ -9,7 +9,7 @@ import {
     TouchableOpacity, ActivityIndicator, TextInput, Platform, RefreshControl,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from '../../components/MapView';
-import { collection, query, where, onSnapshot, orderBy, limit, startAfter } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import useTaskStore from '../../store/useTaskStore';
@@ -47,20 +47,21 @@ export default function RunnerHomeScreen({ navigation }) {
     useEffect(() => {
         const q = query(
             collection(db, 'tasks'),
-            where('status', '==', 'open'),
-            orderBy('createdAt', 'desc'),
-            limit(PAGE_SIZE)
+            where('status', '==', 'open')
         );
 
         const unsub = onSnapshot(q, (snap) => {
             const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            // Sort in memory
+            list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setTasks(list);
             setLastDoc(snap.docs[snap.docs.length - 1]);
-            setHasMore(snap.docs.length === PAGE_SIZE);
+            setHasMore(snap.docs.length >= PAGE_SIZE); // Approximation without limit
             setLoading(false);
             setRefreshing(false);
         }, (err) => {
             console.error("Firestore Error:", err);
+            showAlert('Database Error', 'Could not fetch tasks. This might be due to missing indexes or permissions.');
             setLoading(false);
             setRefreshing(false);
         });
@@ -73,7 +74,6 @@ export default function RunnerHomeScreen({ navigation }) {
         if (loadingMore || !hasMore || !lastDoc) return;
         setLoadingMore(true);
         try {
-            const { getDocs } = await import('firebase/firestore');
             const q = query(
                 collection(db, 'tasks'),
                 where('status', '==', 'open'),

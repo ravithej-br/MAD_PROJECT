@@ -1,6 +1,6 @@
 // src/components/ErrorBoundary.js
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { COLORS } from '../utils/theme';
 
 class ErrorBoundary extends React.Component {

@@ -1,11 +1,11 @@
 // src/screens/runner/RunnerMyJobsScreen.js
 /**
  * Screen showing tasks accepted by the current runner.
- * Refactored: Added server-side sorting, Zustand store integration, and shared utilities.
+ * Refactored: Added in-memory sorting to avoid index requirements, Zustand store integration.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform, RefreshControl } from 'react-native';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import useTaskStore from '../../store/useTaskStore';
@@ -21,17 +21,18 @@ export default function RunnerMyJobsScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    // ✅ Real-time listener with server-side sort
+    // ✅ Real-time listener (Sorted in memory to avoid missing index errors)
     useEffect(() => {
         if (!user) return;
         const q = query(
             collection(db, 'tasks'),
-            where('runnerId', '==', user.uid),
-            orderBy('createdAt', 'desc')
+            where('runnerId', '==', user.uid)
         );
 
         const unsub = onSnapshot(q, (snap) => {
             const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            // Sort in memory (newest first)
+            list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setMyTasks(list);
             setLoading(false);
             setRefreshing(false);
