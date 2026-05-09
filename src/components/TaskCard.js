@@ -1,7 +1,12 @@
 // src/components/TaskCard.js
+/**
+ * Shared Task Card component.
+ * Refactored to use shared distance utilities.
+ */
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, SHADOWS } from '../utils/theme';
+import { getDistance } from '../utils/distance';
 
 const STATUS_CONFIG = {
     open: { color: COLORS.success, label: '● Open' },
@@ -16,19 +21,6 @@ const CATEGORY_ICONS = {
     'Cleaning': '🧹', 'Shopping': '🛒', 'Repairs': '🔧',
     'Photography': '📸', 'Tech Help': '💻',
 };
-
-function getDistance(loc1, loc2) {
-    if (!loc1 || !loc2) return null;
-    const R = 6371;
-    const dLat = (loc2.latitude - loc1.latitude) * Math.PI / 180;
-    const dLon = (loc2.longitude - loc1.longitude) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos(loc1.latitude * Math.PI / 180) *
-        Math.cos(loc2.latitude * Math.PI / 180) *
-        Math.sin(dLon / 2) ** 2;
-    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`;
-}
 
 export default function TaskCard({ task, onPress, showDistance, location }) {
     const st = STATUS_CONFIG[task.status] || STATUS_CONFIG.open;
@@ -172,3 +164,4 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 });
+

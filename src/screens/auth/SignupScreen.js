@@ -1,9 +1,13 @@
 // src/screens/auth/SignupScreen.js
+/**
+ * Signup Screen with role selection and shared utilities.
+ * Refactored: Uses showAlert utility and better validation handling.
+ */
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity,
     StyleSheet, KeyboardAvoidingView, Platform,
-    ScrollView, ActivityIndicator, Alert,
+    ScrollView, ActivityIndicator,
 } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -11,6 +15,7 @@ import { auth, db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import { COLORS } from '../../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { showAlert } from '../../utils/alert';
 
 export default function SignupScreen({ navigation }) {
     const [name, setName] = useState('');
@@ -23,9 +28,8 @@ export default function SignupScreen({ navigation }) {
     const insets = useSafeAreaInsets();
 
     const handleSignup = async () => {
-        if (!name || !email || !password || !selectedRole) {
-            if (Platform.OS === 'web') window.alert('Please fill all fields and select a role.');
-            else Alert.alert('Error', 'Please fill all fields and select a role.');
+        if (!name.trim() || !email.trim() || !password || !selectedRole) {
+            showAlert('Error', 'Please fill all fields and select a role.');
             return;
         }
         setLoading(true);
@@ -33,7 +37,7 @@ export default function SignupScreen({ navigation }) {
             const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
             await setDoc(doc(db, 'users', cred.user.uid), {
                 uid: cred.user.uid,
-                name,
+                name: name.trim(),
                 email: email.trim(),
                 role: selectedRole,
                 rating: 0,
@@ -45,8 +49,7 @@ export default function SignupScreen({ navigation }) {
             setRole(selectedRole);
             setUser(cred.user);
         } catch (err) {
-            if (Platform.OS === 'web') window.alert(err.message);
-            else Alert.alert('Signup Failed', err.message);
+            showAlert('Signup Failed', err.message);
         } finally {
             setLoading(false);
         }
@@ -167,3 +170,4 @@ const styles = StyleSheet.create({
     switchText: { textAlign: 'center', color: COLORS.textMuted, fontSize: 14 },
     switchLink: { color: COLORS.primary, fontWeight: '700' },
 });
+

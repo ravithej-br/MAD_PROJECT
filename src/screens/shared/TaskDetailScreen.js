@@ -96,23 +96,21 @@ export default function TaskDetailScreen({ route, navigation }) {
                         try {
                             await updateDoc(doc(db, 'tasks', task.id), { runnerLocation: runnerLoc });
 
-                            // Runner sees their own ETA too
-                            if (task.location) {
-                                setEtaInfo(calculateETA(runnerLoc, task.location));
-                            }
-                        } catch (e) {
-                            console.log('Location update failed', e);
-                        }
-                    }
-                );
-            }
-        };
 
-        trackRunner();
-        return () => { if (locationSub) locationSub.remove(); };
-    }, [role, task.status, task.runnerId, user]);
+        // Live Runner Tracking (if poster)
+        let locUnsub;
+        if (role === 'poster' && task.status === 'in-progress' && task.runnerId) {
+            locUnsub = onSnapshot(doc(db, 'users', task.runnerId), (snap) => {
+                if (snap.exists() && snap.data().location) {
+                    setTask(prev => ({ ...prev, runnerLocation: snap.data().location }));
+                }
+            });
+        }
 
+        return () => { unsub(); if (locUnsub) locUnsub(); };
+    }, [initialTask.id, role, task.status, task.runnerId]);
 
+    // ✅ Atomic status updates
     const updateStatus = async (newStatus) => {
         setLoading(true);
         try {
@@ -122,15 +120,54 @@ export default function TaskDetailScreen({ route, navigation }) {
             if (newStatus === 'approved') updates.approvedAt = serverTimestamp();
 
             await updateDoc(doc(db, 'tasks', task.id), updates);
-            if (newStatus !== 'approved' && newStatus !== 'in-progress') {
-                Alert.alert('✅ Updated!', `Task is now ${newStatus}.`);
-            } else if (newStatus === 'approved') {
-                Alert.alert('🎉 Approved!', 'Payment processed to the runner.');
-            } else if (newStatus === 'in-progress') {
-                Alert.alert('🚴 On The Way!', 'Get to the location. Your ETA is live.');
-            }
+            
+            let msg = `Task is now ${newStatus}.`;
+            if (newStatus === 'approved') msg = 'Payment processed to the runner.';
+            if (newStatus === 'in-progress') msg = 'Get to the location. Your ETA is live.';
+            
+            showAlert('Success', msg);
         } catch (err) {
-            Alert.alert('Error', err.message);
+            showAlert('Error', err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ✅ Atomic Rating using Transactions
+    const submitRating = async () => {
+        setLoading(true);
+        try {
+            const taskRef = doc(db, 'tasks', task.id);
+            const runnerRef = doc(db, 'users', task.runnerId);
+
+            await runTransaction(db, async (transaction) => {
+                const runnerDoc = await transaction.get(runnerRef);
+                if (!runnerDoc.exists()) throw "Runner profile not found!";
+
+                const runnerData = runnerDoc.data();
+                const newTotalStars = (runnerData.totalStars || 0) + ratingSelected;
+                const newReviewCount = (runnerData.reviewCount || 0) + 1;
+                const newRating = newTotalStars / newReviewCount;
+
+                // 1. Update runner stats
+                transaction.update(runnerRef, {
+                    totalStars: newTotalStars,
+                    reviewCount: newReviewCount,
+                    rating: newRating,
+                    tasksCompleted: (runnerData.tasksCompleted || 0) + 1
+                });
+
+                // 2. Update task rating info
+                transaction.update(taskRef, {
+                    hasRated: true,
+                    ratingValue: ratingSelected,
+                    feedback: feedback.trim()
+                });
+            });
+
+            showAlert('Thanks!', 'Your feedback helps the community stay safe.');
+        } catch (err) {
+            showAlert('Error', err.message);
         } finally {
             setLoading(false);
         }
@@ -142,54 +179,8 @@ export default function TaskDetailScreen({ route, navigation }) {
             await updateDoc(doc(db, 'tasks', task.id), {
                 rejectedBy: arrayUnion(user.uid)
             });
-            Alert.alert('Task Rejected', 'You have rejected this task. It will no longer appear on your map or list.');
             navigation.goBack();
         } catch (err) {
-            Alert.alert('Error', err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const submitRating = async () => {
-        if (ratingSelected === 0) return Alert.alert('Error', 'Please select a rating first.');
-        setLoading(true);
-        try {
-            await updateDoc(doc(db, 'tasks', task.id), { 
-                hasRated: true, 
-                ratingValue: ratingSelected,
-                feedback: feedbackText.trim()
-            });
-
-            if (task.runnerId) {
-                const runnerRef = doc(db, 'users', task.runnerId);
-                const runnerSnap = await getDoc(runnerRef);
-                if (runnerSnap.exists()) {
-                    const runnerData = runnerSnap.data();
-                    const currentTotalStars = runnerData.totalStars || 0;
-                    const currentReviewCount = runnerData.reviewCount || 0;
-
-                    await updateDoc(runnerRef, {
-                        totalStars: currentTotalStars + ratingSelected,
-                        reviewCount: currentReviewCount + 1,
-                        rating: (currentTotalStars + ratingSelected) / (currentReviewCount + 1)
-                    });
-                }
-            }
-            Alert.alert('Thank You!', 'Your feedback has been saved.');
-        } catch (err) {
-            Alert.alert('Error', err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const cancelTask = () => {
-        Alert.alert(
-            'Cancel Task?',
-            'Are you sure you want to cancel and remove this task?',
-            [
-                { text: 'No, Keep it', style: 'cancel' },
                 {
                     text: 'Yes, Cancel',
                     style: 'destructive',

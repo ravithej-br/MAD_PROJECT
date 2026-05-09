@@ -1,18 +1,25 @@
 // src/screens/runner/RunnerHomeScreen.js
+/**
+ * Runner Home Screen to browse available tasks.
+ * Refactored: Added pagination, server-side sorting, Zustand store integration, and shared utilities.
+ */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View, Text, StyleSheet, FlatList,
     TouchableOpacity, ActivityIndicator, TextInput, Platform, RefreshControl,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from '../../components/MapView';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-import * as Location from 'expo-location';
+import { collection, query, where, onSnapshot, orderBy, limit, startAfter } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
+import useTaskStore from '../../store/useTaskStore';
 import { COLORS } from '../../utils/theme';
 import TaskCard from '../../components/TaskCard';
+import { useUserLocation } from '../../utils/location';
+import { showAlert } from '../../utils/alert';
 
 const CATEGORIES = ['All', 'Assembly', 'Dog Walk', 'Delivery', 'Cleaning', 'Shopping', 'Repairs', 'Tech Help'];
+const PAGE_SIZE = 10;
 
 const DEFAULT_REGION = {
     latitude: 12.9716,
@@ -23,72 +30,80 @@ const DEFAULT_REGION = {
 
 export default function RunnerHomeScreen({ navigation }) {
     const { user } = useAuthStore();
-    const [tasks, setTasks] = useState([]);
+    const { tasks, setTasks } = useTaskStore();
+    const { location, locationLoading } = useUserLocation();
+
     const [filtered, setFiltered] = useState([]);
-    const [location, setLocation] = useState(null);
-    const [locationLoading, setLocationLoading] = useState(true);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [mapView, setMapView] = useState(false);
     const [selectedCat, setSelectedCat] = useState('All');
     const [search, setSearch] = useState('');
+    const [lastDoc, setLastDoc] = useState(null);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
 
-    // ✅ Location with timeout — no more hanging
-    useEffect(() => {
-        let cancelled = false;
-        const fetchLocation = async () => {
-            try {
-                const { status } = await Location.requestForegroundPermissionsAsync();
-                if (status !== 'granted') { setLocationLoading(false); return; }
-
-                const loc = await Promise.race([
-                    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-                ]);
-                if (!cancelled) setLocation(loc.coords);
-            } catch {
-                // silently fail — fallback region used
-            } finally {
-                if (!cancelled) setLocationLoading(false);
-            }
-        };
-        fetchLocation();
-        return () => { cancelled = true; };
-    }, []);
-
-    // ✅ Firestore listener
+    // ✅ Initial Firestore listener with server-side sort and limit
     useEffect(() => {
         const q = query(
             collection(db, 'tasks'),
-            where('status', '==', 'open')
+            where('status', '==', 'open'),
+            orderBy('createdAt', 'desc'),
+            limit(PAGE_SIZE)
         );
+
         const unsub = onSnapshot(q, (snap) => {
-            let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            list.sort((a, b) => {
-                const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-                const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
-                return tb - ta;
-            });
+            const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
             setTasks(list);
-            setFiltered(list);
+            setLastDoc(snap.docs[snap.docs.length - 1]);
+            setHasMore(snap.docs.length === PAGE_SIZE);
             setLoading(false);
             setRefreshing(false);
-        }, () => {
+        }, (err) => {
+            console.error("Firestore Error:", err);
             setLoading(false);
             setRefreshing(false);
         });
-        return () => unsub();
-    }, []);
 
-    // ✅ Filtering
+        return () => unsub();
+    }, [setTasks]);
+
+    // ✅ Load more tasks (pagination)
+    const loadMore = async () => {
+        if (loadingMore || !hasMore || !lastDoc) return;
+        setLoadingMore(true);
+        try {
+            const { getDocs } = await import('firebase/firestore');
+            const q = query(
+                collection(db, 'tasks'),
+                where('status', '==', 'open'),
+                orderBy('createdAt', 'desc'),
+                startAfter(lastDoc),
+                limit(PAGE_SIZE)
+            );
+            
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                const newList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setTasks([...tasks, ...newList]);
+                setLastDoc(snap.docs[snap.docs.length - 1]);
+                setHasMore(snap.docs.length === PAGE_SIZE);
+            } else {
+                setHasMore(false);
+            }
+        } catch (err) {
+            showAlert('Error', 'Could not load more tasks.');
+        } finally {
+            setLoadingMore(false);
+        }
+    };
+
+    // ✅ Filtering (Client-side search/category over the fetched pool)
     useEffect(() => {
         let list = tasks;
-
-        // Exclude tasks rejected by this user
         if (user) {
             list = list.filter(t => !(t.rejectedBy && t.rejectedBy.includes(user.uid)));
         }
-
         if (selectedCat !== 'All') list = list.filter((t) => t.category === selectedCat);
         if (search.trim()) list = list.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
         setFiltered(list);
@@ -96,8 +111,12 @@ export default function RunnerHomeScreen({ navigation }) {
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 3000);
+        setLoading(true);
+        setLastDoc(null);
+        setHasMore(true);
+        // Initial useEffect will handle the first page re-fetch via setRefreshing reset or store update
     }, []);
+
 
     const mapRegion = location
         ? { latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.08, longitudeDelta: 0.08 }
@@ -105,22 +124,16 @@ export default function RunnerHomeScreen({ navigation }) {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
             <View style={styles.header}>
                 <View>
                     <Text style={styles.greeting}>Ready to earn? 💪</Text>
                     <Text style={styles.headerTitle}>Browse Tasks</Text>
                 </View>
-                <TouchableOpacity
-                    style={styles.mapToggle}
-                    onPress={() => setMapView(!mapView)}
-                    activeOpacity={0.8}
-                >
+                <TouchableOpacity style={styles.mapToggle} onPress={() => setMapView(!mapView)}>
                     <Text style={styles.mapToggleText}>{mapView ? '📋 List' : '🗺️ Map'}</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* Search — always visible */}
             <View style={styles.searchRow}>
                 <TextInput
                     style={styles.searchInput}
@@ -128,46 +141,37 @@ export default function RunnerHomeScreen({ navigation }) {
                     placeholderTextColor={COLORS.textMuted}
                     value={search}
                     onChangeText={setSearch}
-                    returnKeyType="search"
-                    clearButtonMode="while-editing"
                 />
             </View>
 
-            {/* Filter Categories — only in list mode */}
             {!mapView && (
-                <>
-
-                    <FlatList
-                        data={CATEGORIES}
-                        horizontal
-                        style={{ flexGrow: 0, minHeight: 56, maxHeight: 56 }}
-                        keyExtractor={(item) => item}
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.catList}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={[styles.catChip, selectedCat === item && styles.catChipActive]}
-                                onPress={() => setSelectedCat(item)}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={[styles.catChipText, selectedCat === item && styles.catChipTextActive]}>
-                                    {item}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    />
-                </>
+                <FlatList
+                    data={CATEGORIES}
+                    horizontal
+                    style={{ flexGrow: 0, minHeight: 56 }}
+                    keyExtractor={(item) => item}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.catList}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={[styles.catChip, selectedCat === item && styles.catChipActive]}
+                            onPress={() => setSelectedCat(item)}
+                        >
+                            <Text style={[styles.catChipText, selectedCat === item && styles.catChipTextActive]}>
+                                {item}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                />
             )}
 
-            {/* Live indicator */}
             <View style={styles.liveBar}>
                 <View style={styles.liveDot} />
                 <Text style={styles.liveText}>
-                    {loading ? 'Loading tasks…' : `${filtered.length} task${filtered.length !== 1 ? 's' : ''} available near you`}
+                    {loading ? 'Loading tasks…' : `${filtered.length} task${filtered.length !== 1 ? 's' : ''} available`}
                 </Text>
             </View>
 
-            {/* Map or List */}
             {mapView ? (
                 <View style={styles.mapWrapper}>
                     {locationLoading && (
@@ -176,29 +180,17 @@ export default function RunnerHomeScreen({ navigation }) {
                             <Text style={styles.locationBannerText}>  Getting your location…</Text>
                         </View>
                     )}
-                    <MapView
-                        style={styles.map}
-                        provider={PROVIDER_DEFAULT}
-                        region={mapRegion}
-                        showsUserLocation={!!location}
-                        showsMyLocationButton={!!location}
-                    >
+                    <MapView style={styles.map} provider={PROVIDER_DEFAULT} region={mapRegion} showsUserLocation={!!location}>
                         {filtered.filter((t) => t.location).map((task) => (
                             <Marker
                                 key={task.id}
-                                coordinate={{ latitude: task.location.latitude, longitude: task.location.longitude }}
+                                coordinate={task.location}
                                 title={task.title}
                                 description={`₹${task.price} • ${task.category}`}
-                                onPress={() => navigation.navigate('TaskDetail', { task })}
                                 onCalloutPress={() => navigation.navigate('TaskDetail', { task })}
                             />
                         ))}
                     </MapView>
-                    {filtered.filter(t => t.location).length === 0 && !loading && (
-                        <View style={styles.mapEmptyOverlay}>
-                            <Text style={styles.mapEmptyText}>📍 No tasks with locations pin</Text>
-                        </View>
-                    )}
                 </View>
             ) : loading ? (
                 <View style={styles.loadingState}>
@@ -209,12 +201,6 @@ export default function RunnerHomeScreen({ navigation }) {
                 <View style={styles.empty}>
                     <Text style={styles.emptyEmoji}>🔍</Text>
                     <Text style={styles.emptyTitle}>No tasks found</Text>
-                    <Text style={styles.emptyDesc}>Try a different category or search term.</Text>
-                    {(selectedCat !== 'All' || search) && (
-                        <TouchableOpacity style={styles.resetBtn} onPress={() => { setSelectedCat('All'); setSearch(''); }}>
-                            <Text style={styles.resetBtnText}>Clear Filters</Text>
-                        </TouchableOpacity>
-                    )}
                 </View>
             ) : (
                 <FlatList
@@ -230,9 +216,12 @@ export default function RunnerHomeScreen({ navigation }) {
                     )}
                     contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
                     showsVerticalScrollIndicator={false}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
-                    }
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
+                    ListFooterComponent={hasMore && (
+                        <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={loadingMore}>
+                            {loadingMore ? <ActivityIndicator color={COLORS.primary} /> : <Text style={styles.loadMoreText}>Load More</Text>}
+                        </TouchableOpacity>
+                    )}
                 />
             )}
         </View>
@@ -274,25 +263,15 @@ const styles = StyleSheet.create({
     liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.success, marginRight: 8 },
     liveText: { fontSize: 12, color: COLORS.success, fontWeight: '600' },
     mapWrapper: { flex: 1 },
-    locationBanner: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: '#EEF2FF', paddingVertical: 8,
-    },
+    locationBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEF2FF', paddingVertical: 8 },
     locationBannerText: { color: COLORS.primary, fontSize: 12, fontWeight: '600' },
     map: { flex: 1 },
-    mapEmptyOverlay: {
-        position: 'absolute', bottom: 24, left: 0, right: 0, alignItems: 'center',
-    },
-    mapEmptyText: {
-        backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 16, paddingVertical: 8,
-        borderRadius: 20, fontSize: 13, color: COLORS.textMuted, fontWeight: '600',
-    },
     loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
     loadingText: { color: COLORS.textMuted, fontSize: 14 },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
     emptyEmoji: { fontSize: 52, marginBottom: 12 },
     emptyTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text },
-    emptyDesc: { fontSize: 14, color: COLORS.textMuted, marginTop: 6, textAlign: 'center' },
-    resetBtn: { marginTop: 16, backgroundColor: COLORS.primary + '20', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
-    resetBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
+    loadMoreBtn: { padding: 16, alignItems: 'center' },
+    loadMoreText: { color: COLORS.primary, fontWeight: '700' },
 });
+

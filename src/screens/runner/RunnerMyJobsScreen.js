@@ -1,45 +1,51 @@
 // src/screens/runner/RunnerMyJobsScreen.js
+/**
+ * Screen showing tasks accepted by the current runner.
+ * Refactored: Added server-side sorting, Zustand store integration, and shared utilities.
+ */
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform, RefreshControl } from 'react-native';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
+import useTaskStore from '../../store/useTaskStore';
 import { COLORS } from '../../utils/theme';
 import TaskCard from '../../components/TaskCard';
+import { useUserLocation } from '../../utils/location';
 
 export default function RunnerMyJobsScreen({ navigation }) {
     const { user } = useAuthStore();
-    const [tasks, setTasks] = useState([]);
+    const { myTasks, setMyTasks } = useTaskStore();
+    const { location } = useUserLocation();
+
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    // ✅ Real-time listener with server-side sort
     useEffect(() => {
         if (!user) return;
         const q = query(
             collection(db, 'tasks'),
-            where('runnerId', '==', user.uid)
+            where('runnerId', '==', user.uid),
+            orderBy('createdAt', 'desc')
         );
+
         const unsub = onSnapshot(q, (snap) => {
-            let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            list.sort((a, b) => {
-                const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-                const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
-                return tb - ta;
-            });
-            setTasks(list);
+            const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            setMyTasks(list);
             setLoading(false);
             setRefreshing(false);
         }, (err) => {
-            console.error("Firebase fetch error in RunnerMyJobsScreen:", err);
+            console.error("Firestore Error:", err);
             setLoading(false);
             setRefreshing(false);
         });
+
         return () => unsub();
-    }, [user]);
+    }, [user, setMyTasks]);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 2000);
     }, []);
 
     return (
@@ -47,25 +53,31 @@ export default function RunnerMyJobsScreen({ navigation }) {
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>My Jobs</Text>
             </View>
+
             {loading ? (
-                <View style={styles.center}>
+                <View style={styles.loadingState}>
                     <ActivityIndicator color={COLORS.primary} size="large" />
+                    <Text style={styles.loadingText}>Loading your jobs…</Text>
                 </View>
-            ) : tasks.length === 0 ? (
-                <View style={styles.center}>
-                    <Text style={{ fontSize: 40, marginBottom: 12 }}>💼</Text>
-                    <Text style={styles.emptyTitle}>No Jobs Yet</Text>
-                    <Text style={styles.emptyText}>Accept a task to see it here.</Text>
+            ) : myTasks.length === 0 ? (
+                <View style={styles.empty}>
+                    <Text style={styles.emptyEmoji}>💼</Text>
+                    <Text style={styles.emptyTitle}>No jobs yet</Text>
+                    <Text style={styles.emptyDesc}>Accept a task from the home screen to get started.</Text>
                 </View>
             ) : (
                 <FlatList
-                    data={tasks}
-                    keyExtractor={(t) => t.id}
+                    data={myTasks}
+                    keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
-                        <TaskCard task={item} onPress={() => navigation.navigate('TaskDetail', { task: item })} />
+                        <TaskCard
+                            task={item}
+                            onPress={() => navigation.navigate('TaskDetail', { task: item })}
+                            showDistance
+                            location={location}
+                        />
                     )}
-                    contentContainerStyle={{ padding: 16 }}
-                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
                 />
             )}
@@ -77,10 +89,13 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
     header: {
         paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 56 : 48, paddingBottom: 16,
-        backgroundColor: COLORS.card, borderBottomWidth: 1, borderBottomColor: COLORS.border
+        backgroundColor: COLORS.card, borderBottomWidth: 1, borderBottomColor: COLORS.border,
     },
     headerTitle: { fontSize: 24, fontWeight: '800', color: COLORS.text },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    emptyTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 6 },
-    emptyText: { color: COLORS.textMuted, fontSize: 14 },
+    loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    loadingText: { color: COLORS.textMuted, fontSize: 14 },
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+    emptyEmoji: { fontSize: 60, marginBottom: 16 },
+    emptyTitle: { fontSize: 22, fontWeight: '800', color: COLORS.text, marginBottom: 8 },
+    emptyDesc: { fontSize: 15, color: COLORS.textMuted, textAlign: 'center', lineHeight: 22 },
 });

@@ -4,11 +4,12 @@ import {
     View, Text, StyleSheet, TouchableOpacity,
     ScrollView, ActivityIndicator, Alert, Platform
 } from 'react-native';
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import { COLORS } from '../../utils/theme';
+import { showAlert } from '../../utils/alert';
 
 export default function ProfileScreen() {
     const { user, role, logout } = useAuthStore();
@@ -76,23 +77,22 @@ export default function ProfileScreen() {
         };
     }, [user, role]);
 
-    const handleLogout = async () => {
-        if (Platform.OS === 'web') {
-            if (window.confirm('Are you sure you want to logout?')) {
-                await signOut(auth);
-                logout();
-            }
-        } else {
-            Alert.alert('Logout', 'Are you sure you want to logout?', [
+    const handleLogout = () => {
+        showAlert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Logout', style: 'destructive', onPress: async () => {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: async () => {
                         await signOut(auth);
                         logout();
-                    },
-                },
-            ]);
-        }
+                    }
+                }
+            ]
+        );
     };
 
     if (loading) return <ActivityIndicator color={COLORS.primary} style={{ flex: 1, marginTop: 100 }} size="large" />;
@@ -148,11 +148,11 @@ export default function ProfileScreen() {
             {/* Menu Items */}
             <View style={styles.menuCard}>
                 {[
-                    { icon: '👤', label: 'Edit Profile', onPress: () => Alert.alert('Coming Soon', 'Edit Profile settings will be available in the next update.') },
-                    { icon: '🔔', label: 'Notifications', onPress: () => Alert.alert('Coming Soon', 'Notification settings will be available in the next update.') },
-                    { icon: '🔒', label: 'Privacy & Security', onPress: () => Alert.alert('Coming Soon', 'Privacy settings will be available in the next update.') },
-                    { icon: '❓', label: 'Help & Support', onPress: () => Alert.alert('Help & Support', 'Please contact support@taskhub.com for any assistance.') },
-                    { icon: '📄', label: 'Terms & Privacy', onPress: () => Alert.alert('Terms & Privacy', 'Please visit taskhub.com/legal to view our terms.') },
+                    { icon: '👤', label: 'Edit Profile', onPress: () => showAlert('Coming Soon', 'Edit Profile settings will be available in the next update.') },
+                    { icon: '🔔', label: 'Notifications', onPress: () => showAlert('Coming Soon', 'Notification settings will be available in the next update.') },
+                    { icon: '🔒', label: 'Privacy & Security', onPress: () => showAlert('Coming Soon', 'Privacy settings will be available in the next update.') },
+                    { icon: '❓', label: 'Help & Support', onPress: () => showAlert('Help & Support', 'Please contact support@taskhub.com for any assistance.') },
+                    { icon: '📄', label: 'Terms & Privacy', onPress: () => showAlert('Terms & Privacy', 'Please visit taskhub.com/legal to view our terms.') },
                 ].map((item, i) => (
                     <TouchableOpacity key={item.label} style={[styles.menuItem, i > 0 && styles.menuItemBorder]} onPress={item.onPress}>
                         <Text style={styles.menuIcon}>{item.icon}</Text>

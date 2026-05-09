@@ -1,13 +1,3 @@
-//Poster User credentials to test the app
-##luffy 
-##luffy@gmail.com 
-##ishowspeed 
-
-//Runner User credentials to test the app
-##zoro
-##zoro@gmail.com
-##swordsman
-
 
 # TASK HUB - Project Structure Guide
 
@@ -72,12 +62,3 @@ taskhub/
 3. **Scalability**: If you decide to add an entirely new feature (like Chat or Payments in the future), you can easily add a new folder inside `src/screens/` and logic inside `src/utils/` without cluttering the existing code.
 
 
-//Poster User credentials to test the app
-##luffy 
-##luffy@gmail.com 
-##ishowspeed 
-
-//Runner User credentials to test the app
-##zoro
-##zoro@gmail.com
-##swordsman

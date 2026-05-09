@@ -1,9 +1,13 @@
 // src/screens/auth/LoginScreen.js
+/**
+ * Login Screen with clean architecture and shared utilities.
+ * Refactored: Uses showAlert utility and better input handling.
+ */
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity,
     StyleSheet, KeyboardAvoidingView, Platform,
-    ScrollView, ActivityIndicator, Alert,
+    ScrollView, ActivityIndicator,
 } from 'react-native';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -11,6 +15,7 @@ import { auth, db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import { COLORS } from '../../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { showAlert } from '../../utils/alert';
 
 export default function LoginScreen({ navigation }) {
     const [email, setEmail] = useState('');
@@ -21,9 +26,8 @@ export default function LoginScreen({ navigation }) {
     const insets = useSafeAreaInsets();
 
     const handleLogin = async () => {
-        if (!email || !password) {
-            if (Platform.OS === 'web') window.alert('Please fill in all fields.');
-            else Alert.alert('Error', 'Please fill in all fields.');
+        if (!email.trim() || !password) {
+            showAlert('Error', 'Please fill in all fields.');
             return;
         }
         setLoading(true);
@@ -34,31 +38,26 @@ export default function LoginScreen({ navigation }) {
                 setRole(snap.data().role);
                 setUser(userCredential.user);
             } else {
-                if (Platform.OS === 'web') window.alert('User data not found.');
-                else Alert.alert('Error', 'User data not found.');
+                showAlert('Error', 'User data not found.');
             }
         } catch (err) {
-            if (Platform.OS === 'web') window.alert(err.message);
-            else Alert.alert('Login Failed', err.message);
+            showAlert('Login Failed', err.message);
         } finally {
             setLoading(false);
         }
     };
 
     const handleForgotPassword = async () => {
-        if (!email) {
-            if (Platform.OS === 'web') window.alert('Please enter your email address to reset your password.');
-            else Alert.alert('Email Required', 'Please enter your email address to reset your password.');
+        if (!email.trim()) {
+            showAlert('Email Required', 'Please enter your email address to reset your password.');
             return;
         }
         setLoading(true);
         try {
             await sendPasswordResetEmail(auth, email.trim());
-            if (Platform.OS === 'web') window.alert('Password reset email sent! Please check your inbox.');
-            else Alert.alert('Success', 'Password reset email sent! Please check your inbox.');
+            showAlert('Success', 'Password reset email sent! Please check your inbox.');
         } catch (err) {
-            if (Platform.OS === 'web') window.alert(err.message);
-            else Alert.alert('Error', err.message);
+            showAlert('Error', err.message);
         } finally {
             setLoading(false);
         }
@@ -184,3 +183,4 @@ const styles = StyleSheet.create({
     switchText: { textAlign: 'center', color: COLORS.textMuted, fontSize: 14 },
     switchLink: { color: COLORS.primary, fontWeight: '700' },
 });
+
