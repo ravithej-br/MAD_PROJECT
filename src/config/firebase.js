@@ -1,9 +1,10 @@
 // src/config/firebase.js
 // 🔥 TASK HUB — Firebase Configuration (taskhub-7048b)
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence, getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const firebaseConfig = {
     apiKey: "AIzaSyBWaCwJjyongwy4nu1tYj3pWD6q9N8CJ9s",
@@ -18,10 +19,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // ✅ React Native needs initializeAuth with AsyncStorage persistence
-// Using getAuth() causes silent failures in React Native
-export const auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-});
+// Using getAuth() works correctly on the web
+export const auth = Platform.OS === 'web'
+    ? getAuth(app)
+    : initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+    });
 
 export const db = getFirestore(app);
 export default app;

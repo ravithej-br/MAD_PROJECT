@@ -4,7 +4,7 @@ import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
     Alert, ActivityIndicator, Platform, Linking
 } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_DEFAULT } from '../../components/MapView';
 import * as Location from 'expo-location';
 import { doc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
