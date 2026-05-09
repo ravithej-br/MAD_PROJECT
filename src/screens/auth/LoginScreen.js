@@ -22,19 +22,24 @@ export default function LoginScreen({ navigation }) {
 
     const handleLogin = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Please fill in all fields.');
+            if (Platform.OS === 'web') window.alert('Please fill in all fields.');
+            else Alert.alert('Error', 'Please fill in all fields.');
             return;
         }
         setLoading(true);
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
             const snap = await getDoc(doc(db, 'users', userCredential.user.uid));
             if (snap.exists()) {
                 setRole(snap.data().role);
                 setUser(userCredential.user);
+            } else {
+                if (Platform.OS === 'web') window.alert('User data not found.');
+                else Alert.alert('Error', 'User data not found.');
             }
         } catch (err) {
-            Alert.alert('Login Failed', err.message);
+            if (Platform.OS === 'web') window.alert(err.message);
+            else Alert.alert('Login Failed', err.message);
         } finally {
             setLoading(false);
         }
@@ -42,15 +47,18 @@ export default function LoginScreen({ navigation }) {
 
     const handleForgotPassword = async () => {
         if (!email) {
-            Alert.alert('Email Required', 'Please enter your email address to reset your password.');
+            if (Platform.OS === 'web') window.alert('Please enter your email address to reset your password.');
+            else Alert.alert('Email Required', 'Please enter your email address to reset your password.');
             return;
         }
         setLoading(true);
         try {
-            await sendPasswordResetEmail(auth, email);
-            Alert.alert('Success', 'Password reset email sent! Please check your inbox.');
+            await sendPasswordResetEmail(auth, email.trim());
+            if (Platform.OS === 'web') window.alert('Password reset email sent! Please check your inbox.');
+            else Alert.alert('Success', 'Password reset email sent! Please check your inbox.');
         } catch (err) {
-            Alert.alert('Error', err.message);
+            if (Platform.OS === 'web') window.alert(err.message);
+            else Alert.alert('Error', err.message);
         } finally {
             setLoading(false);
         }

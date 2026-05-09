@@ -5,7 +5,7 @@ import {
     FlatList, ActivityIndicator, RefreshControl, Platform, Alert
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from '../../components/MapView';
-import { collection, query, where, onSnapshot, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, updateDoc, doc } from 'firebase/firestore';
 import * as Location from 'expo-location';
 import { db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
@@ -97,6 +97,7 @@ export default function PosterHomeScreen({ navigation }) {
     const getStatusColor = (status) => {
         if (status === 'open') return COLORS.success;
         if (status === 'in-progress') return COLORS.warning;
+        if (status === 'cancelled') return '#EF4444';
         return COLORS.textMuted;
     };
 
@@ -123,7 +124,7 @@ export default function PosterHomeScreen({ navigation }) {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteDoc(doc(db, 'tasks', task.id));
+                            await updateDoc(doc(db, 'tasks', task.id), { status: 'cancelled' });
                         } catch (err) {
                             Alert.alert('Error', err.message);
                         }

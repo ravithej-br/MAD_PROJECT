@@ -7,7 +7,8 @@ const STATUS_CONFIG = {
     open: { color: COLORS.success, label: '● Open' },
     'in-progress': { color: COLORS.warning, label: '● In Progress' },
     completed: { color: COLORS.textMuted, label: '✓ Pending Approval' },
-    approved: { color: '#3B82F6', label: '🏆 Approved' }
+    approved: { color: '#3B82F6', label: '🏆 Approved' },
+    cancelled: { color: '#EF4444', label: '● Cancelled' }
 };
 
 const CATEGORY_ICONS = {
@@ -82,6 +83,20 @@ export default function TaskCard({ task, onPress, showDistance, location }) {
                         : 'Just now'}
                 </Text>
             </View>
+
+            {/* Rating Section for Runner/Poster View */}
+            {task.hasRated && (
+                <View style={styles.ratingSection}>
+                    <View style={styles.ratingBadge}>
+                        <Text style={styles.ratingText}>⭐ {task.ratingValue}</Text>
+                    </View>
+                    {task.feedback ? (
+                        <Text style={styles.feedbackText} numberOfLines={1}>
+                            "{task.feedback}"
+                        </Text>
+                    ) : null}
+                </View>
+            )}
         </TouchableOpacity>
     );
 }
@@ -127,5 +142,33 @@ const styles = StyleSheet.create({
     },
     cancelLinkText: {
         fontSize: 11, fontWeight: '700', color: '#EF4444',
+    },
+    ratingSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        gap: 10,
+    },
+    ratingBadge: {
+        backgroundColor: '#FFFBEB',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    ratingText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#B45309',
+    },
+    feedbackText: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        fontStyle: 'italic',
+        flex: 1,
     },
 });

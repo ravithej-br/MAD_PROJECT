@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    Alert, ActivityIndicator, Platform, Linking
+    Alert, ActivityIndicator, Platform, Linking, TextInput
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from '../../components/MapView';
 import * as Location from 'expo-location';
@@ -16,7 +16,8 @@ const STATUS_CONFIG = {
     open: { color: COLORS.success, bg: '#F0FFF4', label: '🟢 Open' },
     'in-progress': { color: COLORS.warning, bg: '#FFFBEB', label: '🟡 On The Way' },
     completed: { color: '#6B7280', bg: '#F7FAFC', label: '✅ Pending Approval' },
-    approved: { color: '#3B82F6', bg: '#EFF6FF', label: '🏆 Approved & Paid' }
+    approved: { color: '#3B82F6', bg: '#EFF6FF', label: '🏆 Approved & Paid' },
+    cancelled: { color: '#EF4444', bg: '#FEE2E2', label: '❌ Cancelled' }
 };
 
 const CATEGORY_ICONS = {
@@ -52,6 +53,7 @@ export default function TaskDetailScreen({ route, navigation }) {
     const [loading, setLoading] = useState(false);
     const [etaInfo, setEtaInfo] = useState(null);
     const [ratingSelected, setRatingSelected] = useState(0);
+    const [feedbackText, setFeedbackText] = useState('');
     const insets = useSafeAreaInsets();
 
     const st = STATUS_CONFIG[task.status] || STATUS_CONFIG.open;
@@ -153,7 +155,11 @@ export default function TaskDetailScreen({ route, navigation }) {
         if (ratingSelected === 0) return Alert.alert('Error', 'Please select a rating first.');
         setLoading(true);
         try {
-            await updateDoc(doc(db, 'tasks', task.id), { hasRated: true, ratingValue: ratingSelected });
+            await updateDoc(doc(db, 'tasks', task.id), { 
+                hasRated: true, 
+                ratingValue: ratingSelected,
+                feedback: feedbackText.trim()
+            });
 
             if (task.runnerId) {
                 const runnerRef = doc(db, 'users', task.runnerId);
@@ -190,7 +196,7 @@ export default function TaskDetailScreen({ route, navigation }) {
                     onPress: async () => {
                         setLoading(true);
                         try {
-                            await deleteDoc(doc(db, 'tasks', task.id));
+                            await updateDoc(doc(db, 'tasks', task.id), { status: 'cancelled' });
                             // Alert/GoBack will be handled by the onSnapshot listener safely
                         } catch (err) {
                             Alert.alert('Error', err.message);
@@ -345,6 +351,17 @@ export default function TaskDetailScreen({ route, navigation }) {
                                 </TouchableOpacity>
                             ))}
                         </View>
+
+                        <TextInput
+                            style={styles.feedbackInput}
+                            placeholder="Add your comments or feedback (optional)"
+                            placeholderTextColor={COLORS.textMuted}
+                            value={feedbackText}
+                            onChangeText={setFeedbackText}
+                            multiline
+                            numberOfLines={3}
+                        />
+
                         <TouchableOpacity style={[styles.btnRating, loading && { opacity: 0.7 }]} onPress={submitRating} disabled={loading}>
                             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnRatingText}>Submit Feedback</Text>}
                         </TouchableOpacity>
@@ -354,6 +371,11 @@ export default function TaskDetailScreen({ route, navigation }) {
                     <View style={styles.ratingCard}>
                         <Text style={styles.ratingTitle}>You rated this {task.ratingValue} ⭐</Text>
                         <Text style={styles.ratingDesc}>Thank you for your feedback!</Text>
+                        {task.feedback ? (
+                            <View style={styles.feedbackDisplay}>
+                                <Text style={styles.feedbackDisplayText}>"{task.feedback}"</Text>
+                            </View>
+                        ) : null}
                     </View>
                 )}
 
@@ -472,6 +494,34 @@ const styles = StyleSheet.create({
     starsRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
     starIcon: { fontSize: 32, color: COLORS.text },
     starSelected: { color: '#FBBF24' },
+    feedbackInput: {
+        width: '100%',
+        backgroundColor: COLORS.background,
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 14,
+        color: COLORS.text,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        marginBottom: 20,
+        textAlignVertical: 'top',
+        minHeight: 80,
+    },
+    feedbackDisplay: {
+        width: '100%',
+        backgroundColor: COLORS.background,
+        borderRadius: 12,
+        padding: 14,
+        marginTop: 10,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    feedbackDisplayText: {
+        fontSize: 14,
+        color: COLORS.text,
+        fontStyle: 'italic',
+        textAlign: 'center',
+    },
     btnRating: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24, width: '100%', alignItems: 'center' },
     btnRatingText: { color: '#fff', fontWeight: '700', fontSize: 15 },
     actionBar: {

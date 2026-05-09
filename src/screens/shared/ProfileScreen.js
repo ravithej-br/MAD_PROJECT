@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    ScrollView, ActivityIndicator, Alert,
+    ScrollView, ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -13,7 +13,7 @@ import { COLORS } from '../../utils/theme';
 export default function ProfileScreen() {
     const { user, role, logout } = useAuthStore();
     const [profile, setProfile] = useState(null);
-    const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, todayEarned: 0, monthEarned: 0 });
+    const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, todayEarned: 0, monthEarned: 0, avgRating: 0 });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -55,11 +55,16 @@ export default function ProfileScreen() {
                 });
             }
 
+            const ratedTasks = taskList.filter(t => t.hasRated && t.ratingValue);
+            const totalStars = ratedTasks.reduce((acc, t) => acc + t.ratingValue, 0);
+            const avgRating = ratedTasks.length > 0 ? totalStars / ratedTasks.length : 0;
+
             setTaskStats({
                 total: taskList.length,
                 completed: taskList.filter((t) => t.status === 'completed' || t.status === 'approved').length,
                 todayEarned,
                 monthEarned,
+                avgRating
             });
             setLoading(false);
         });
@@ -72,15 +77,22 @@ export default function ProfileScreen() {
     }, [user, role]);
 
     const handleLogout = async () => {
-        Alert.alert('Logout', 'Are you sure you want to logout?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Logout', style: 'destructive', onPress: async () => {
-                    await signOut(auth);
-                    logout();
+        if (Platform.OS === 'web') {
+            if (window.confirm('Are you sure you want to logout?')) {
+                await signOut(auth);
+                logout();
+            }
+        } else {
+            Alert.alert('Logout', 'Are you sure you want to logout?', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Logout', style: 'destructive', onPress: async () => {
+                        await signOut(auth);
+                        logout();
+                    },
                 },
-            },
-        ]);
+            ]);
+        }
     };
 
     if (loading) return <ActivityIndicator color={COLORS.primary} style={{ flex: 1, marginTop: 100 }} size="large" />;
@@ -114,7 +126,7 @@ export default function ProfileScreen() {
                     <Text style={styles.statLabel}>Completed</Text>
                 </View>
                 <View style={styles.statItem}>
-                    <Text style={styles.statNum}>⭐ {profile?.rating?.toFixed(1) || 'N/A'}</Text>
+                    <Text style={styles.statNum}>⭐ {taskStats.avgRating > 0 ? taskStats.avgRating.toFixed(1) : 'N/A'}</Text>
                     <Text style={styles.statLabel}>Rating</Text>
                 </View>
             </View>

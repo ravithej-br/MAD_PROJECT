@@ -24,25 +24,29 @@ export default function SignupScreen({ navigation }) {
 
     const handleSignup = async () => {
         if (!name || !email || !password || !selectedRole) {
-            Alert.alert('Error', 'Please fill all fields and select a role.');
+            if (Platform.OS === 'web') window.alert('Please fill all fields and select a role.');
+            else Alert.alert('Error', 'Please fill all fields and select a role.');
             return;
         }
         setLoading(true);
         try {
-            const cred = await createUserWithEmailAndPassword(auth, email, password);
+            const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
             await setDoc(doc(db, 'users', cred.user.uid), {
                 uid: cred.user.uid,
                 name,
-                email,
+                email: email.trim(),
                 role: selectedRole,
                 rating: 0,
+                totalStars: 0,
+                reviewCount: 0,
                 tasksCompleted: 0,
                 createdAt: serverTimestamp(),
             });
             setRole(selectedRole);
             setUser(cred.user);
         } catch (err) {
-            Alert.alert('Signup Failed', err.message);
+            if (Platform.OS === 'web') window.alert(err.message);
+            else Alert.alert('Signup Failed', err.message);
         } finally {
             setLoading(false);
         }

@@ -1,3 +1,14 @@
+//Poster User credentials to test the app
+##luffy 
+##luffy@gmail.com 
+##ishowspeed 
+
+//Runner User credentials to test the app
+##zoro
+##zoro@gmail.com
+##swordsman
+
+
 # TASK HUB - Project Structure Guide
 
 After the completion of the project, the Task Hub application follows a clean, highly organized, and modular folder structure. This ensures that the codebase is scalable, maintainable, and easy for any developer to understand.
@@ -59,3 +70,14 @@ taskhub/
 1. **Separation of Concerns**: Screens are isolated from configurations and components.
 2. **Role-Based Grouping**: By splitting screens into `poster`, `runner`, and `auth`, it is instantly obvious which files are responsible for which user experience.
 3. **Scalability**: If you decide to add an entirely new feature (like Chat or Payments in the future), you can easily add a new folder inside `src/screens/` and logic inside `src/utils/` without cluttering the existing code.
+
+
+//Poster User credentials to test the app
+##luffy 
+##luffy@gmail.com 
+##ishowspeed 
+
+//Runner User credentials to test the app
+##zoro
+##zoro@gmail.com
+##swordsman
