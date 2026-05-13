@@ -1,79 +1,98 @@
 // src/components/MapView.web.js
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { MapContainer, TileLayer, Marker as LeafletMarker, Polyline as LeafletPolyline, useMapEvents, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 
-const MapView = ({ children, style, region }) => {
-    const mapUrl = region ? `https://www.google.com/maps/search/?api=1&query=${region.latitude},${region.longitude}` : '#';
+// Fix for default Leaflet icon not appearing in bundled environments
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: markerIcon2x,
+    iconUrl: markerIcon,
+    shadowUrl: markerShadow,
+});
+
+// Component to handle map clicks and sync region
+function MapController({ onPress, region }) {
+    const map = useMap();
+    
+    useEffect(() => {
+        if (region) {
+            map.setView([region.latitude, region.longitude], map.getZoom());
+        }
+    }, [region?.latitude, region?.longitude]);
+
+    useMapEvents({
+        click(e) {
+            if (onPress) {
+                onPress({
+                    nativeEvent: {
+                        coordinate: {
+                            latitude: e.latlng.lat,
+                            longitude: e.latlng.lng,
+                        }
+                    }
+                });
+            }
+        },
+    });
+    return null;
+}
+
+const MapView = ({ children, style, region, onPress, showsUserLocation }) => {
+    const center = region ? [region.latitude, region.longitude] : [12.9716, 77.5946];
+
     return (
-        <View style={[style, styles.webMap]}>
-            <View style={styles.webMapOverlay}>
-                <Text style={styles.webMapEmoji}>📍</Text>
-                <Text style={styles.webMapText}>Interactive Map (Native Only)</Text>
-                <Text style={styles.webMapSub}>To maintain performance, the interactive map is enabled in the mobile app.</Text>
-                <TouchableOpacity 
-                    style={styles.webMapBtn} 
-                    onPress={() => window.open(mapUrl, '_blank')}
-                >
-                    <Text style={styles.webMapBtnText}>View Location on Google Maps ↗</Text>
-                </TouchableOpacity>
-            </View>
-            {children}
+        <View style={[style, styles.container]}>
+            <MapContainer 
+                center={center} 
+                zoom={14} 
+                style={{ height: '100%', width: '100%' }}
+                scrollWheelZoom={true}
+            >
+                <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; OpenStreetMap contributors'
+                />
+                <MapController onPress={onPress} region={region} />
+                {children}
+            </MapContainer>
         </View>
     );
 };
 
-const Marker = () => null;
-const Polyline = () => null;
-const PROVIDER_DEFAULT = 'default';
+// Wrapper for Marker to match react-native-maps API
+export const Marker = ({ coordinate, title, pinColor }) => {
+    if (!coordinate) return null;
+    return (
+        <LeafletMarker position={[coordinate.latitude, coordinate.longitude]}>
+            {/* Tooltip could be added here if needed */}
+        </LeafletMarker>
+    );
+};
+
+// Wrapper for Polyline to match react-native-maps API
+export const Polyline = ({ coordinates, strokeColor, strokeWidth }) => {
+    if (!coordinates || coordinates.length < 2) return null;
+    const positions = coordinates.map(c => [c.latitude, c.longitude]);
+    return <LeafletPolyline positions={positions} color={strokeColor} weight={strokeWidth} />;
+};
+
+export const PROVIDER_DEFAULT = 'default';
 
 const styles = StyleSheet.create({
-    webMap: {
+    container: {
         backgroundColor: '#F1F5F9',
         borderRadius: 16,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#E2E8F0',
-    },
-    webMapOverlay: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-        backgroundColor: 'rgba(255,255,255,0.4)',
-    },
-    webMapEmoji: { fontSize: 32, marginBottom: 12 },
-    webMapText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1E293B',
-        marginBottom: 8,
-        textAlign: 'center'
-    },
-    webMapSub: {
-        fontSize: 13,
-        color: '#64748B',
-        textAlign: 'center',
-        lineHeight: 18,
-        marginBottom: 20,
-        maxWidth: 240,
-    },
-    webMapBtn: {
-        backgroundColor: '#4F46E5',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 10,
-        elevation: 2,
-        shadowColor: '#4F46E5',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-    },
-    webMapBtnText: {
-        color: '#fff',
-        fontWeight: '600',
-        fontSize: 13,
     }
 });
 
 export default MapView;
-export { Marker, Polyline, PROVIDER_DEFAULT };
