@@ -56,7 +56,11 @@ export default function SignupScreen({ navigation }) {
     };
 
     return (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView 
+            style={styles.flex} 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 80}
+        >
             <ScrollView contentContainerStyle={[styles.container, { paddingBottom: Math.max(insets.bottom, 24) }]} keyboardShouldPersistTaps="handled">
                 <View style={styles.header}>
                     <Text style={styles.logo}>⚡ TASK HUB</Text>

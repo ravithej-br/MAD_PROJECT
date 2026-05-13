@@ -141,7 +141,7 @@ export default function PosterHomeScreen({ navigation }) {
                         onPress={() => setFilterStatus(filterStatus === status ? 'all' : status)}
                     >
                         <Text style={[styles.statNum, { color: status === 'open' ? COLORS.success : status === 'in-progress' ? COLORS.warning : COLORS.primary }]}>
-                            {stats[status === 'inProgress' ? 'inProgress' : status]}
+                            {stats[status === 'in-progress' ? 'inProgress' : status]}
                         </Text>
                         <Text style={styles.statLabel}>{status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}</Text>
                     </TouchableOpacity>

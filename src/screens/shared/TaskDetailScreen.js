@@ -6,10 +6,10 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    ActivityIndicator, Platform, TextInput
+    ActivityIndicator, Platform, TextInput, KeyboardAvoidingView
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from '../../components/MapView';
-import { doc, onSnapshot, updateDoc, serverTimestamp, runTransaction, arrayUnion } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, getDoc, serverTimestamp, arrayUnion, increment } from 'firebase/firestore';
 import * as Location from 'expo-location';
 import { db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
@@ -102,7 +102,7 @@ export default function TaskDetailScreen({ route, navigation }) {
         if (newStatus === 'in-progress') {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
-                showAlert('Location Denied', 'You must allow location access to accept tasks.');
+                setToast('⚠️ Location access is required to accept tasks.');
                 return;
             }
         }
@@ -121,12 +121,12 @@ export default function TaskDetailScreen({ route, navigation }) {
             setLoading(false);
 
             let msg = `Task is now ${newStatus}.`;
-            if (newStatus === 'approved') msg = 'Payment processed to the runner.';
-            if (newStatus === 'in-progress') msg = 'Live location shared with poster.';
+            if (newStatus === 'approved') msg = 'Payment processed to the runner. 💰';
+            if (newStatus === 'in-progress') msg = 'Live location shared with poster. 📍';
             setToast(msg);
         } catch (err) {
             setLoading(false);
-            showAlert('Error', err.message);
+            setToast('Error: ' + (err.message || 'Something went wrong.'));
         }
     };
 
@@ -136,26 +136,28 @@ export default function TaskDetailScreen({ route, navigation }) {
             const taskRef = doc(db, 'tasks', task.id);
             const runnerRef = doc(db, 'users', task.runnerId);
 
-            await runTransaction(db, async (transaction) => {
-                const runnerDoc = await transaction.get(runnerRef);
-                if (!runnerDoc.exists()) throw "Runner profile not found!";
-                const runnerData = runnerDoc.data();
-                transaction.update(runnerRef, {
-                    totalStars: (runnerData.totalStars || 0) + ratingSelected,
-                    reviewCount: (runnerData.reviewCount || 0) + 1,
-                    rating: ((runnerData.totalStars || 0) + ratingSelected) / ((runnerData.reviewCount || 0) + 1),
-                    tasksCompleted: (runnerData.tasksCompleted || 0) + 1
-                });
-                transaction.update(taskRef, {
-                    hasRated: true, ratingValue: ratingSelected, feedback: feedback.trim()
-                });
+            // Step 1: Save feedback on the task document (poster owns this)
+            await updateDoc(taskRef, {
+                hasRated: true, ratingValue: ratingSelected, feedback: feedback.trim()
             });
 
+            // Step 2: Update runner's stats (best-effort, won't block feedback)
+            // Step 2: Update runner's stats (Atomic update to avoid race conditions)
+            try {
+                await updateDoc(runnerRef, {
+                    totalStars: increment(ratingSelected),
+                    reviewCount: increment(1),
+                    tasksCompleted: increment(1)
+                });
+            } catch (runnerErr) {
+                console.warn('Runner stats update failed (non-critical):', runnerErr.message);
+            }
+
             setLoading(false);
-            setToast('Feedback submitted! Thanks.');
+            setToast('Feedback submitted! Thanks. 🎉');
         } catch (err) {
             setLoading(false);
-            showAlert('Error', err.message);
+            setToast('Error: ' + (err.message || 'Could not submit feedback.'));
         }
     };
 
@@ -167,7 +169,7 @@ export default function TaskDetailScreen({ route, navigation }) {
             navigation.goBack();
         } catch (err) {
             setLoading(false);
-            showAlert('Error', err.message);
+            setToast('Error: ' + (err.message || 'Could not reject task.'));
         }
     };
 
@@ -176,7 +178,11 @@ export default function TaskDetailScreen({ route, navigation }) {
     const formattedDist = task.runnerLocation && task.location ? getDistance(task.runnerLocation, task.location) : null;
 
     return (
-        <View style={styles.flex}>
+        <KeyboardAvoidingView 
+            style={styles.flex} 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}><Text style={styles.back}>← Back</Text></TouchableOpacity>
                 <Text style={styles.headerTitle}>Task Details</Text>
@@ -247,7 +253,7 @@ export default function TaskDetailScreen({ route, navigation }) {
                     )}
                 </View>
             </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 

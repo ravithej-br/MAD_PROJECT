@@ -25,7 +25,12 @@
       "package": "com.bmsce.taskhub"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "name": "TASK HUB",
+      "shortName": "TaskHub",
+      "description": "Premium local task marketplace. Connect with runners and get things done.",
+      "themeColor": "#4F46E5"
     },
     "plugins": [
       [

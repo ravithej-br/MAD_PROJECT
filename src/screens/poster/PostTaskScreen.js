@@ -53,7 +53,7 @@ export default function PostTaskScreen({ navigation }) {
 
     const validateStep1 = () => {
         let newErrors = {};
-        
+
         // Title validation: 5-60 chars, no special chars only
         const titleTrimmed = title.trim();
         if (titleTrimmed.length < 5 || titleTrimmed.length > 60) {
@@ -117,7 +117,11 @@ export default function PostTaskScreen({ navigation }) {
     };
 
     return (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 30 : 30}
+        >
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => step === 1 ? navigation.goBack() : setStep(1)}>
                     <Text style={styles.back}>← Back</Text>

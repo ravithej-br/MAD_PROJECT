@@ -121,14 +121,16 @@ export default function ProfileScreen() {
                     <Text style={styles.statNum}>{taskStats.total}</Text>
                     <Text style={styles.statLabel}>{role === 'poster' ? 'Tasks Posted' : 'Tasks Taken'}</Text>
                 </View>
-                <View style={[styles.statItem, styles.statDivider]}>
+                <View style={role === 'runner' ? [styles.statItem, styles.statDivider] : styles.statItem}>
                     <Text style={styles.statNum}>{taskStats.completed}</Text>
                     <Text style={styles.statLabel}>Completed</Text>
                 </View>
-                <View style={styles.statItem}>
-                    <Text style={styles.statNum}>⭐ {taskStats.avgRating > 0 ? taskStats.avgRating.toFixed(1) : 'N/A'}</Text>
-                    <Text style={styles.statLabel}>Rating</Text>
-                </View>
+                {role === 'runner' && (
+                    <View style={styles.statItem}>
+                        <Text style={styles.statNum}>⭐ {taskStats.avgRating > 0 ? taskStats.avgRating.toFixed(1) : 'N/A'}</Text>
+                        <Text style={styles.statLabel}>Rating</Text>
+                    </View>
+                )}
             </View>
 
             {/* Runner Earnings */}
