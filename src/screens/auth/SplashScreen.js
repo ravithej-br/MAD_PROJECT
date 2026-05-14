@@ -1,5 +1,5 @@
 // src/screens/auth/SplashScreen.js
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { COLORS, FONTS } from '../../utils/theme';
 
@@ -7,7 +7,7 @@ export default function SplashScreen() {
     const scale = new Animated.Value(0.5);
     const opacity = new Animated.Value(0);
 
-    useEffect(() => {
+    React.useEffect(() => {
         Animated.parallel([
             Animated.timing(scale, {
                 toValue: 1,

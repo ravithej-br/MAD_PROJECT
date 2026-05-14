@@ -3,7 +3,8 @@
  * useUserLocation custom hook.
  * Extracts location logic with race-condition handling and timeouts.
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import React from 'react';
 import * as Location from 'expo-location';
 
 const DEFAULT_LOCATION = { latitude: 12.9716, longitude: 77.5946 }; // Bengaluru Fallback
@@ -12,7 +13,7 @@ export function useUserLocation() {
     const [location, setLocation] = useState(null);
     const [locationLoading, setLocationLoading] = useState(true);
 
-    useEffect(() => {
+    React.useEffect(() => {
         let isCancelled = false;
 
         const fetchLocation = async () => {

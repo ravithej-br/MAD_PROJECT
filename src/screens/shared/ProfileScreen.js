@@ -1,5 +1,5 @@
 // src/screens/shared/ProfileScreen.js
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     ScrollView, ActivityIndicator, Alert, Platform
@@ -17,7 +17,7 @@ export default function ProfileScreen() {
     const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, todayEarned: 0, monthEarned: 0, avgRating: 0 });
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (!user) return;
         setLoading(true);
 

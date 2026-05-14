@@ -3,7 +3,7 @@
  * Runner Home Screen to browse available tasks.
  * Refactored: Added pagination, server-side sorting, Zustand store integration, and shared utilities.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View, Text, StyleSheet, FlatList,
     TouchableOpacity, ActivityIndicator, TextInput, Platform, RefreshControl,
@@ -44,7 +44,7 @@ export default function RunnerHomeScreen({ navigation }) {
     const [loadingMore, setLoadingMore] = useState(false);
 
     // ✅ Initial Firestore listener with server-side sort and limit
-    useEffect(() => {
+    React.useEffect(() => {
         const q = query(
             collection(db, 'tasks'),
             where('status', '==', 'open')
@@ -99,7 +99,7 @@ export default function RunnerHomeScreen({ navigation }) {
     };
 
     // ✅ Filtering (Client-side search/category over the fetched pool)
-    useEffect(() => {
+    React.useEffect(() => {
         let list = tasks;
         if (user) {
             list = list.filter(t => !(t.rejectedBy && t.rejectedBy.includes(user.uid)));

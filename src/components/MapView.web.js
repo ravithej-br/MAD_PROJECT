@@ -1,5 +1,5 @@
 // src/components/MapView.web.js
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { MapContainer, TileLayer, Marker as LeafletMarker, Polyline as LeafletPolyline, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -21,7 +21,7 @@ L.Icon.Default.mergeOptions({
 function MapController({ onPress, region }) {
     const map = useMap();
     
-    useEffect(() => {
+    React.useEffect(() => {
         if (region) {
             map.setView([region.latitude, region.longitude], map.getZoom());
         }

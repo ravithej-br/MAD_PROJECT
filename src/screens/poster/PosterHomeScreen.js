@@ -3,7 +3,7 @@
  * Poster Home Screen to manage posted tasks.
  * Refactored: Added server-side sorting, Zustand store integration, and shared utilities.
  */
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     FlatList, ActivityIndicator, RefreshControl, Platform
@@ -45,7 +45,7 @@ export default function PosterHomeScreen({ navigation }) {
     const mapRef = useRef(null);
 
     // ✅ Real-time listener with server-side sort
-    useEffect(() => {
+    React.useEffect(() => {
         if (!user) return;
         const q = query(
             collection(db, 'tasks'),

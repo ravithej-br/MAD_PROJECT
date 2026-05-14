@@ -3,7 +3,7 @@
  * Main App Navigator.
  * Refactored: Extracted tabs into separate files, added auth safety, and simplified structure.
  */
-import React, { useEffect } from 'react';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -33,7 +33,7 @@ const Stack = createNativeStackNavigator();
 export default function AppNavigator() {
     const { user, role, isLoading, setUser, setRole, setLoading } = useAuthStore();
 
-    useEffect(() => {
+    React.useEffect(() => {
         // Auth Listener
         const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
             try {

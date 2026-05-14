@@ -3,7 +3,7 @@
  * Screen showing tasks accepted by the current runner.
  * Refactored: Added in-memory sorting to avoid index requirements, Zustand store integration.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform, RefreshControl } from 'react-native';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -22,7 +22,7 @@ export default function RunnerMyJobsScreen({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
 
     // ✅ Real-time listener (Sorted in memory to avoid missing index errors)
-    useEffect(() => {
+    React.useEffect(() => {
         if (!user) return;
         const q = query(
             collection(db, 'tasks'),

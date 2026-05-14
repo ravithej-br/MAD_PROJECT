@@ -3,7 +3,7 @@
  * Detailed view of a task.
  * Fixed: Robust Toast notification and permission handling.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     ActivityIndicator, Platform, TextInput, KeyboardAvoidingView
@@ -40,7 +40,7 @@ export default function TaskDetailScreen({ route, navigation }) {
     const [toast, setToast] = useState(null);
 
     // ✅ Toast Auto-Dismiss
-    useEffect(() => {
+    React.useEffect(() => {
         if (toast) {
             const timer = setTimeout(() => setToast(null), 3000);
             return () => clearTimeout(timer);
@@ -48,7 +48,7 @@ export default function TaskDetailScreen({ route, navigation }) {
     }, [toast]);
 
     // ✅ Subscribe to live task updates
-    useEffect(() => {
+    React.useEffect(() => {
         const unsub = onSnapshot(doc(db, 'tasks', initialTask.id), (snap) => {
             if (snap.exists()) {
                 const data = { id: snap.id, ...snap.data() };
@@ -63,7 +63,7 @@ export default function TaskDetailScreen({ route, navigation }) {
     }, [initialTask.id, updateTask]);
 
     // Live Runner Tracking (if poster)
-    useEffect(() => {
+    React.useEffect(() => {
         if (role !== 'poster' || task.status !== 'in-progress' || !task.runnerId) return;
         const locUnsub = onSnapshot(doc(db, 'users', task.runnerId), (snap) => {
             if (snap.exists() && snap.data().location) {
@@ -74,7 +74,7 @@ export default function TaskDetailScreen({ route, navigation }) {
     }, [role, task.status, task.runnerId]);
 
     // ✅ Live Location Tracking for Runner (when task is in-progress)
-    useEffect(() => {
+    React.useEffect(() => {
         let subscription;
         const isMyTask = role === 'runner' && task.status === 'in-progress' && task.runnerId === user.uid;
         if (!isMyTask) return;
