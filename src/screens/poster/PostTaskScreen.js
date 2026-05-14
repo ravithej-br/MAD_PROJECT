@@ -64,8 +64,8 @@ export default function PostTaskScreen({ navigation }) {
 
         // Description validation: 20-500 chars
         const descTrimmed = description.trim();
-        if (descTrimmed.length < 10 || descTrimmed.length > 500) {
-            newErrors.description = 'Description must be between 10 and 500 characters.';
+        if (!descTrimmed) {
+            newErrors.description = 'Please enter a description.';
         }
 
         // Price validation: positive number, max 99,999
@@ -155,7 +155,7 @@ export default function PostTaskScreen({ navigation }) {
                     <Text style={styles.label}>Description *</Text>
                     <TextInput
                         style={[styles.input, { height: 100, textAlignVertical: 'top' }, errors.description && styles.inputError]}
-                        placeholder="Describe what you need (min 20 characters)..."
+                        placeholder="Describe what you need..."
                         placeholderTextColor={COLORS.textMuted}
                         multiline
                         value={description}
