@@ -64,8 +64,8 @@ export default function PostTaskScreen({ navigation }) {
 
         // Description validation: 20-500 chars
         const descTrimmed = description.trim();
-        if (descTrimmed.length < 20 || descTrimmed.length > 500) {
-            newErrors.description = 'Description must be between 20 and 500 characters.';
+        if (descTrimmed.length < 10 || descTrimmed.length > 500) {
+            newErrors.description = 'Description must be between 10 and 500 characters.';
         }
 
         // Price validation: positive number, max 99,999
