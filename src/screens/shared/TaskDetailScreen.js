@@ -35,7 +35,7 @@ export default function TaskDetailScreen({ route, navigation }) {
 
     const [task, setTask] = useState(initialTask);
     const [loading, setLoading] = useState(false);
-    const [ratingSelected, setRatingSelected] = useState(5);
+    const [ratingSelected, setRatingSelected] = useState(0);
     const [feedback, setFeedback] = useState('');
     const [toast, setToast] = useState(null);
 
@@ -75,27 +75,47 @@ export default function TaskDetailScreen({ route, navigation }) {
 
     // ✅ Live Location Tracking for Runner (when task is in-progress)
     React.useEffect(() => {
+        let isCancelled = false;
         let subscription;
         const isMyTask = role === 'runner' && task.status === 'in-progress' && task.runnerId === user.uid;
         if (!isMyTask) return;
 
         const startTracking = async () => {
             try {
-                subscription = await Location.watchPositionAsync(
+                const sub = await Location.watchPositionAsync(
                     { accuracy: Location.Accuracy.Balanced, distanceInterval: 20, timeInterval: 15000 },
                     (loc) => {
+                        if (isCancelled) return;
                         const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
                         updateDoc(doc(db, 'tasks', task.id), { runnerLocation: coords });
                         updateDoc(doc(db, 'users', user.uid), { location: coords });
                     }
                 );
+                if (isCancelled) {
+                    try {
+                        sub.remove();
+                    } catch (e) {
+                        console.warn("Failed to remove location subscription:", e);
+                    }
+                } else {
+                    subscription = sub;
+                }
             } catch (err) {
                 console.warn("Tracking error:", err);
             }
         };
 
         startTracking();
-        return () => { if (subscription) subscription.remove(); };
+        return () => {
+            isCancelled = true;
+            if (subscription) {
+                try {
+                    subscription.remove();
+                } catch (err) {
+                    console.warn("Error removing location subscription:", err);
+                }
+            }
+        };
     }, [role, task.status, task.id, user.uid, task.runnerId]);
 
     const updateStatus = async (newStatus) => {
@@ -131,6 +151,10 @@ export default function TaskDetailScreen({ route, navigation }) {
     };
 
     const submitRating = async () => {
+        if (ratingSelected === 0) {
+            showAlert('Rating Required', 'Please select a rating before submitting.');
+            return;
+        }
         setLoading(true);
         try {
             const taskRef = doc(db, 'tasks', task.id);

@@ -16,6 +16,7 @@ import useAuthStore from '../../store/useAuthStore';
 import { COLORS } from '../../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { showAlert } from '../../utils/alert';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SignupScreen({ navigation }) {
     const [name, setName] = useState('');
@@ -26,6 +27,8 @@ export default function SignupScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
     const { setUser, setRole } = useAuthStore();
     const insets = useSafeAreaInsets();
+    const emailInputRef = React.useRef(null);
+    const passwordInputRef = React.useRef(null);
 
     const handleSignup = async () => {
         if (!name.trim() || !email.trim() || !password || !selectedRole) {
@@ -71,23 +74,50 @@ export default function SignupScreen({ navigation }) {
                     <Text style={styles.cardTitle}>Create Account</Text>
 
                     <Text style={styles.label}>Full Name</Text>
-                    <TextInput style={styles.input} placeholder="John Doe" placeholderTextColor={COLORS.textMuted} value={name} onChangeText={setName} />
+                    <TextInput 
+                        style={styles.input} 
+                        placeholder="John Doe" 
+                        placeholderTextColor={COLORS.textMuted} 
+                        value={name} 
+                        onChangeText={setName} 
+                        returnKeyType="next"
+                        onSubmitEditing={() => emailInputRef.current?.focus()}
+                        blurOnSubmit={false}
+                    />
 
                     <Text style={styles.label}>Email</Text>
-                    <TextInput style={styles.input} placeholder="you@email.com" placeholderTextColor={COLORS.textMuted} keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
+                    <TextInput 
+                        ref={emailInputRef}
+                        style={styles.input} 
+                        placeholder="you@email.com" 
+                        placeholderTextColor={COLORS.textMuted} 
+                        keyboardType="email-address" 
+                        autoCapitalize="none" 
+                        value={email} 
+                        onChangeText={setEmail} 
+                        returnKeyType="next"
+                        onSubmitEditing={() => passwordInputRef.current?.focus()}
+                        blurOnSubmit={false}
+                    />
 
                     <Text style={styles.label}>Password</Text>
                     <View style={styles.passwordContainer}>
                         <TextInput
+                            ref={passwordInputRef}
                             style={styles.inputPassword}
                             placeholder="Min. 6 characters"
                             placeholderTextColor={COLORS.textMuted}
                             secureTextEntry={!showPassword}
                             value={password}
                             onChangeText={setPassword}
+                            returnKeyType="done"
                         />
                         <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
-                            <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁️'}</Text>
+                            <Ionicons 
+                                name={showPassword ? "eye" : "eye-off"} 
+                                size={22} 
+                                color={COLORS.textMuted} 
+                            />
                         </TouchableOpacity>
                     </View>
 

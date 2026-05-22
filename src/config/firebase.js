@@ -2,6 +2,7 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, getReactNativePersistence, getAuth } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -24,6 +25,7 @@ export const auth = Platform.OS === 'web'
     });
 
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // ✅ Enable offline persistence for web
 if (Platform.OS === 'web') {

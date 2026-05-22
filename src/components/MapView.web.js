@@ -1,20 +1,29 @@
 // src/components/MapView.web.js
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { MapContainer, TileLayer, Marker as LeafletMarker, Polyline as LeafletPolyline, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker as LeafletMarker, Polyline as LeafletPolyline, Popup as LeafletPopup, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Fix for default Leaflet icon not appearing in bundled environments
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+// Fix for default Leaflet icon not appearing in bundled environments by using dynamic SVG data URIs
+const getSvgIconUrl = (color) => {
+    const svgString = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="36" height="36">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/>
+        </svg>
+    `.trim();
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
+};
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-    iconRetinaUrl: markerIcon2x,
-    iconUrl: markerIcon,
-    shadowUrl: markerShadow,
+    iconUrl: getSvgIconUrl('#4F46E5'),
+    iconRetinaUrl: getSvgIconUrl('#4F46E5'),
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -36],
+    shadowUrl: null,
+    shadowSize: null,
 });
 
 // Component to handle map clicks and sync region
@@ -67,11 +76,50 @@ const MapView = ({ children, style, region, onPress, showsUserLocation }) => {
 };
 
 // Wrapper for Marker to match react-native-maps API
-export const Marker = ({ coordinate, title, pinColor }) => {
+export const Marker = ({ coordinate, title, description, pinColor, onCalloutPress }) => {
     if (!coordinate) return null;
+
+    const icon = pinColor ? L.icon({
+        iconUrl: getSvgIconUrl(pinColor),
+        iconSize: [36, 36],
+        iconAnchor: [18, 36],
+        popupAnchor: [0, -36],
+    }) : undefined;
+
     return (
-        <LeafletMarker position={[coordinate.latitude, coordinate.longitude]}>
-            {/* Tooltip could be added here if needed */}
+        <LeafletMarker position={[coordinate.latitude, coordinate.longitude]} icon={icon}>
+            {(title || description) && (
+                <LeafletPopup>
+                    <div style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', padding: '2px', minWidth: '150px' }}>
+                        {title && <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px', color: '#1E293B' }}>{title}</div>}
+                        {description && <div style={{ fontSize: '12px', color: '#64748B', marginBottom: onCalloutPress ? '8px' : '0' }}>{description}</div>}
+                        {onCalloutPress && (
+                            <button 
+                                onClick={(e) => {
+                                    // Prevent map clicks/events when clicking the popup button
+                                    e.stopPropagation();
+                                    if (onCalloutPress) onCalloutPress();
+                                }}
+                                style={{
+                                    width: '100%',
+                                    padding: '6px 10px',
+                                    backgroundColor: '#4F46E5',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    textAlign: 'center',
+                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                }}
+                            >
+                                View Details
+                            </button>
+                        )}
+                    </div>
+                </LeafletPopup>
+            )}
         </LeafletMarker>
     );
 };

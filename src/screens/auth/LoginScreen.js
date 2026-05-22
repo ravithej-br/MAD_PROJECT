@@ -16,6 +16,7 @@ import useAuthStore from '../../store/useAuthStore';
 import { COLORS } from '../../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { showAlert } from '../../utils/alert';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen({ navigation }) {
     const [email, setEmail] = useState('');
@@ -24,6 +25,7 @@ export default function LoginScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
     const { setUser, setRole } = useAuthStore();
     const insets = useSafeAreaInsets();
+    const passwordInputRef = React.useRef(null);
 
     const handleLogin = async () => {
         if (!email.trim() || !password) {
@@ -87,19 +89,29 @@ export default function LoginScreen({ navigation }) {
                         autoCapitalize="none"
                         value={email}
                         onChangeText={setEmail}
+                        returnKeyType="next"
+                        onSubmitEditing={() => passwordInputRef.current?.focus()}
+                        blurOnSubmit={false}
                     />
 
                     <View style={styles.passwordContainer}>
                         <TextInput
+                            ref={passwordInputRef}
                             style={styles.inputPassword}
                             placeholder="••••••••"
                             placeholderTextColor={COLORS.textMuted}
                             secureTextEntry={!showPassword}
                             value={password}
                             onChangeText={setPassword}
+                            returnKeyType="done"
+                            onSubmitEditing={handleLogin}
                         />
                         <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
-                            <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁️'}</Text>
+                            <Ionicons 
+                                name={showPassword ? "eye" : "eye-off"} 
+                                size={22} 
+                                color={COLORS.textMuted} 
+                            />
                         </TouchableOpacity>
                     </View>
 
