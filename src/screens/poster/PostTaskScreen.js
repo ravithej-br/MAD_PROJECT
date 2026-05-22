@@ -195,46 +195,48 @@ export default function PostTaskScreen({ navigation }) {
                         <Text style={styles.nextBtnText}>Next: Set Location →</Text>
                     </TouchableOpacity>
                 </ScrollView>
-            ) : (
-                <View style={styles.flex}>
-                    <View style={styles.mapHintBar}>
-                        {locationLoading ? (
-                            <View style={styles.locatingRow}>
-                                <ActivityIndicator size="small" color={COLORS.primary} />
-                                <Text style={styles.mapHint}>  Getting your location…</Text>
-                            </View>
-                        ) : (
-                            <Text style={styles.mapHint}>📍 Tap anywhere on the map to set task location</Text>
-                        )}
-                    </View>
-
-                    <MapView
-                        style={styles.map}
-                        provider={PROVIDER_DEFAULT}
-                        region={taskLocation
-                            ? { ...taskLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 }
-                            : { ...DEFAULT_LOCATION, latitudeDelta: 0.05, longitudeDelta: 0.05 }
-                        }
-                        onPress={(e) => setTaskLocation(e.nativeEvent.coordinate)}
-                        showsUserLocation={true}
-                    >
-                        {taskLocation && <Marker coordinate={taskLocation} title="Task Location" />}
-                    </MapView>
-
-                    <View style={[styles.mapControls, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                        <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
-                            <Text style={styles.backBtnText}>← Back</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.postBtn, (loading || !taskLocation) && { opacity: 0.7 }]}
-                            onPress={handlePost}
-                            disabled={loading || !taskLocation}
-                        >
-                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.postBtnText}>🚀 Post Task</Text>}
-                        </TouchableOpacity>
-                    </View>
-                </View>
             )}
+
+            {/* Map step — always mounted to avoid Leaflet _leaflet_events crash on remount */}
+            <View style={[styles.flex, step !== 2 && styles.hidden]}>
+                <View style={styles.mapHintBar}>
+                    {locationLoading ? (
+                        <View style={styles.locatingRow}>
+                            <ActivityIndicator size="small" color={COLORS.primary} />
+                            <Text style={styles.mapHint}>  Getting your location…</Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.mapHint}>📍 Tap anywhere on the map to set task location</Text>
+                    )}
+                </View>
+
+                <MapView
+                    style={styles.map}
+                    provider={PROVIDER_DEFAULT}
+                    region={taskLocation
+                        ? { ...taskLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 }
+                        : { ...DEFAULT_LOCATION, latitudeDelta: 0.05, longitudeDelta: 0.05 }
+                    }
+                    onPress={(e) => setTaskLocation(e.nativeEvent.coordinate)}
+                    showsUserLocation={true}
+                    visible={step === 2}
+                >
+                    {taskLocation && <Marker coordinate={taskLocation} title="Task Location" />}
+                </MapView>
+
+                <View style={[styles.mapControls, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                    <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
+                        <Text style={styles.backBtnText}>← Back</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.postBtn, (loading || !taskLocation) && { opacity: 0.7 }]}
+                        onPress={handlePost}
+                        disabled={loading || !taskLocation}
+                    >
+                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.postBtnText}>🚀 Post Task</Text>}
+                    </TouchableOpacity>
+                </View>
+            </View>
         </KeyboardAvoidingView>
     );
 }
@@ -292,6 +294,6 @@ const styles = StyleSheet.create({
     },
     backBtnText: { fontWeight: '600', color: COLORS.text },
     postBtn: { flex: 2, backgroundColor: COLORS.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
-    postBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+    hidden: { display: 'none' },
 });
 
