@@ -1,5 +1,5 @@
 // src/components/MapView.web.js
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import {
     MapContainer, TileLayer,
@@ -33,22 +33,40 @@ L.Icon.Default.mergeOptions({
 // Inner component: handles map clicks and syncs region changes safely
 function MapController({ onPress, region, visible }) {
     const map = useMap();
+    const [isReady, setIsReady] = useState(false);
 
-    // Invalidate size whenever the map becomes visible (fixes blank/broken map on conditional display)
+    // Wait for map to be fully ready
     React.useEffect(() => {
-        if (!visible) return;
-        map.whenReady(() => {
+        if (!map) return;
+        try {
+            if (map.isLoading && map.isLoading()) {
+                map.whenReady(() => setIsReady(true));
+            } else {
+                setIsReady(true);
+            }
+        } catch (e) {
+            setIsReady(false);
+        }
+    }, [map]);
+
+    // Invalidate size when visible (using safer approach)
+    React.useEffect(() => {
+        if (!visible || !isReady || !map) return;
+        const timer = setTimeout(() => {
             try {
-                map.invalidateSize();
+                if (map && map._container && map.invalidateSize) {
+                    map.invalidateSize();
+                }
             } catch (e) {
                 // ignore
             }
-        });
-    }, [visible, map]);
+        }, 100);
+        return () => clearTimeout(timer);
+    }, [visible, isReady, map]);
 
     // Sync map center when region prop changes
     React.useEffect(() => {
-        if (!region) return;
+        if (!region || !isReady || !map) return;
         try {
             const currentCenter = map.getCenter();
             const lat = region.latitude;
@@ -63,7 +81,7 @@ function MapController({ onPress, region, visible }) {
         } catch (e) {
             // Map container may have been removed; ignore
         }
-    }, [region?.latitude, region?.longitude]);
+    }, [region?.latitude, region?.longitude, isReady, map]);
 
     useMapEvents({
         click(e) {
