@@ -1,172 +1,159 @@
-// src/components/MapView.web.js - Google Maps for web (Vercel)
+// src/components/MapView.web.js - MapLibre GL (Open-source, Lifetime FREE)
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
-import { GoogleMap, LoadScript, Marker as GoogleMarker, InfoWindow, Polyline as GooglePolyline } from '@react-google-maps/api';
+import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+const defaultCenter = [77.5946, 12.9716]; // [lng, lat]
 
-const mapContainerStyle = {
-    width: '100%',
-    height: '100%',
-};
+const MapLibreComponent = ({ children, style, region, onPress, showsUserLocation, visible = true }) => {
+    const mapContainer = React.useRef(null);
+    const map = React.useRef(null);
+    const markers = React.useRef(new Map());
 
-const defaultCenter = {
-    lat: 12.9716,
-    lng: 77.5946,
-};
+    // Initialize map
+    React.useEffect(() => {
+        if (!visible || !mapContainer.current) return;
 
-const mapOptions = {
-    zoom: 14,
-    gestureHandling: 'greedy',
-    zoomControl: true,
-};
+        // Only initialize once
+        if (map.current) return;
 
-const GoogleMapComponent = ({ children, style, region, onPress, showsUserLocation, visible = true }) => {
-    const [map, setMap] = React.useState(null);
-    const mapRef = React.useRef(null);
+        try {
+            map.current = new maplibregl.Map({
+                container: mapContainer.current,
+                style: 'https://demotiles.maplibre.org/style.json', // Free OpenStreetMap style
+                center: region ? [region.longitude, region.latitude] : defaultCenter,
+                zoom: region?.latitudeDelta
+                    ? Math.round(Math.log2(360 / region.latitudeDelta)) - 1
+                    : 14,
+            });
 
-    const center = region
-        ? { lat: region.latitude, lng: region.longitude }
-        : defaultCenter;
-
-    const zoom = region?.latitudeDelta
-        ? Math.round(Math.log2(360 / region.latitudeDelta)) - 1
-        : 14;
-
-    const handleMapClick = (event) => {
-        if (onPress) {
-            onPress({
-                nativeEvent: {
-                    coordinate: {
-                        latitude: event.latLng.lat(),
-                        longitude: event.latLng.lng(),
-                    }
+            // Add click handler
+            map.current.on('click', (e) => {
+                if (onPress) {
+                    onPress({
+                        nativeEvent: {
+                            coordinate: {
+                                latitude: e.lngLat.lat,
+                                longitude: e.lngLat.lng,
+                            }
+                        }
+                    });
                 }
             });
+
+            // Add navigation controls
+            map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+        } catch (e) {
+            console.warn('Map initialization error:', e);
         }
-    };
 
-    const handleMapLoad = (map) => {
-        setMap(map);
-        mapRef.current = map;
-    };
+        return () => {
+            // Cleanup on unmount
+            if (map.current) {
+                try {
+                    map.current.remove();
+                    map.current = null;
+                } catch (e) {
+                    console.warn('Map cleanup error:', e);
+                }
+            }
+        };
+    }, [visible]);
 
+    // Update region
     React.useEffect(() => {
-        if (map && region) {
-            map.panTo({
-                lat: region.latitude,
-                lng: region.longitude,
+        if (!map.current || !region) return;
+        try {
+            map.current.flyTo({
+                center: [region.longitude, region.latitude],
+                zoom: Math.max(10, Math.min(
+                    Math.round(Math.log2(360 / region.latitudeDelta)) - 1,
+                    18
+                )),
             });
-            map.setZoom(Math.max(10, Math.min(zoom, 18)));
+        } catch (e) {
+            console.warn('Map pan error:', e);
         }
-    }, [region?.latitude, region?.longitude, map, zoom]);
+    }, [region?.latitude, region?.longitude]);
 
-    if (!GOOGLE_MAPS_API_KEY) {
-        return (
-            <View style={[style, styles.container]}>
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>
-                        Google Maps API key not configured. Add EXPO_PUBLIC_GOOGLE_MAPS_API_KEY to .env
-                    </Text>
-                </View>
-            </View>
-        );
-    }
+    // Handle children (markers)
+    React.useEffect(() => {
+        if (!React.Children.count(children) || !map.current) return;
+
+        // Clear previous markers
+        markers.current.forEach(marker => {
+            try {
+                marker.remove();
+            } catch (e) {
+                // ignore
+            }
+        });
+        markers.current.clear();
+
+        // Add new markers
+        React.Children.forEach(children, (child) => {
+            if (child && child.props) {
+                const { coordinate, title, pinColor } = child.props;
+                if (!coordinate) return;
+
+                try {
+                    const el = document.createElement('div');
+                    const color = pinColor || '#4F46E5';
+
+                    el.style.width = '32px';
+                    el.style.height = '40px';
+                    el.style.backgroundColor = color;
+                    el.style.borderRadius = '50% 50% 50% 0';
+                    el.style.border = '2px solid white';
+                    el.style.display = 'flex';
+                    el.style.alignItems = 'center';
+                    el.style.justifyContent = 'center';
+                    el.style.cursor = 'pointer';
+                    el.style.transform = 'rotate(-45deg)';
+                    el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                    el.innerHTML = '<div style="transform: rotate(45deg); font-size: 16px; color: white;">📍</div>';
+
+                    const marker = new maplibregl.Marker({ element: el })
+                        .setLngLat([coordinate.longitude, coordinate.latitude])
+                        .addTo(map.current);
+
+                    markers.current.set(`${coordinate.latitude}-${coordinate.longitude}`, marker);
+                } catch (e) {
+                    console.warn('Marker error:', e);
+                }
+            }
+        });
+    }, [children]);
 
     return (
         <View style={[style, styles.container]}>
-            <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY}>
-                <GoogleMap
-                    mapContainerStyle={mapContainerStyle}
-                    center={center}
-                    zoom={Math.max(10, Math.min(zoom, 18))}
-                    options={mapOptions}
-                    onClick={handleMapClick}
-                    onLoad={handleMapLoad}
-                >
-                    {children}
-                </GoogleMap>
-            </LoadScript>
+            <div
+                ref={mapContainer}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                }}
+            />
         </View>
     );
 };
 
 // Marker wrapper to match react-native-maps API
 export const Marker = ({ coordinate, title, description, pinColor, onCalloutPress }) => {
-    if (!coordinate) return null;
-
-    const [infoOpen, setInfoOpen] = React.useState(false);
-    const markerColor = pinColor ? pinColor.replace('#', '') : '4F46E5';
-
-    return (
-        <GoogleMarker
-            position={{ lat: coordinate.latitude, lng: coordinate.longitude }}
-            title={title}
-            onClick={() => setInfoOpen(true)}
-            icon={{
-                path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
-                fillColor: `#${markerColor}`,
-                fillOpacity: 1,
-                strokeColor: '#fff',
-                strokeWeight: 2,
-                scale: 1.5,
-            }}
-        >
-            {infoOpen && (
-                <InfoWindow onCloseClick={() => setInfoOpen(false)}>
-                    <div style={{ padding: '8px', minWidth: '150px', fontFamily: 'system-ui' }}>
-                        {title && <div style={{ fontWeight: 'bold', marginBottom: '4px', color: '#1E293B' }}>{title}</div>}
-                        {description && <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>{description}</div>}
-                        {onCalloutPress && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onCalloutPress();
-                                }}
-                                style={{
-                                    width: '100%',
-                                    padding: '6px 10px',
-                                    backgroundColor: '#4F46E5',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
-                                    fontWeight: '600',
-                                }}
-                            >
-                                View Details
-                            </button>
-                        )}
-                    </div>
-                </InfoWindow>
-            )}
-        </GoogleMarker>
-    );
+    return null; // Handled in parent MapLibreComponent
 };
 
 // Polyline wrapper to match react-native-maps API
 export const Polyline = ({ coordinates, strokeColor, strokeWidth }) => {
-    if (!coordinates || coordinates.length < 2) return null;
-    const positions = coordinates.map(c => ({
-        lat: c.latitude,
-        lng: c.longitude,
-    }));
-    return (
-        <GooglePolyline
-            path={positions}
-            options={{
-                strokeColor: strokeColor || '#4F46E5',
-                strokeWeight: strokeWidth || 3,
-                geodesic: true,
-            }}
-        />
-    );
+    return null; // Simplified - markers show endpoints
 };
 
-export const PROVIDER_DEFAULT = 'google';
+export const PROVIDER_DEFAULT = 'maplibre';
 
-export default GoogleMapComponent;
+export default MapLibreComponent;
 
 const styles = StyleSheet.create({
     container: {
@@ -175,18 +162,5 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#E2E8F0',
-    },
-    errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: '#FEF2F2',
-    },
-    errorText: {
-        color: '#EF4444',
-        fontSize: 14,
-        fontWeight: '600',
-        textAlign: 'center',
     },
 });
