@@ -37,15 +37,14 @@ function MapController({ onPress, region, visible }) {
     // Invalidate size whenever the map becomes visible (fixes blank/broken map on conditional display)
     React.useEffect(() => {
         if (!visible) return;
-        const timer = setTimeout(() => {
+        map.whenReady(() => {
             try {
                 map.invalidateSize();
             } catch (e) {
-                // Map may not be ready yet; ignore
+                // ignore
             }
-        }, 50);
-        return () => clearTimeout(timer);
-    }, [visible]);
+        });
+    }, [visible, map]);
 
     // Sync map center when region prop changes
     React.useEffect(() => {
