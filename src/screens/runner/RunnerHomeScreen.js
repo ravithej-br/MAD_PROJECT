@@ -173,7 +173,7 @@ export default function RunnerHomeScreen({ navigation }) {
             </View>
 
             {mapView ? (
-                <View style={styles.mapWrapper}>
+                <View style={[styles.mapWrapper, { display: mapView ? 'flex' : 'none' }]}> 
                     {locationLoading && (
                         <View style={styles.locationBanner}>
                             <ActivityIndicator size="small" color={COLORS.primary} />
@@ -181,18 +181,33 @@ export default function RunnerHomeScreen({ navigation }) {
                         </View>
                     )}
                     <MapView style={styles.map} provider={PROVIDER_DEFAULT} region={mapRegion} showsUserLocation={!!location}>
-                        {filtered.filter((t) => t.location).map((task) => (
+                        {filtered.filter(t => t.location).map(task => (
                             <Marker
                                 key={task.id}
                                 coordinate={task.location}
                                 title={task.title}
                                 description={`₹${task.price} • ${task.category}`}
-                                onCalloutPress={() => navigation.navigate('TaskDetail', { task })}
-                            />
-                        ))}
-                    </MapView>
-                </View>
-            ) : loading ? (
+            <View style={[styles.mapWrapper, { display: mapView ? 'flex' : 'none' }]}>
+                {locationLoading && (
+                    <View style={styles.locationBanner}>
+                        <ActivityIndicator size="small" color={COLORS.primary} />
+                        <Text style={styles.locationBannerText}>  Getting your location…</Text>
+                    </View>
+                )}
+                <MapView style={styles.map} provider={PROVIDER_DEFAULT} region={mapRegion} showsUserLocation={!!location}>
+                    {filtered.filter(t => t.location).map(task => (
+                        <Marker
+                            key={task.id}
+                            coordinate={task.location}
+                            title={task.title}
+                            description={`₹${task.price} • ${task.category}`}
+                            onCalloutPress={() => navigation.navigate('TaskDetail', { task })}
+                        />
+                    ))}
+                </MapView>
+            </View>
+
+            {!mapView && (loading ? (
                 <View style={styles.loadingState}>
                     <ActivityIndicator color={COLORS.primary} size="large" />
                     <Text style={styles.loadingText}>Finding tasks near you…</Text>

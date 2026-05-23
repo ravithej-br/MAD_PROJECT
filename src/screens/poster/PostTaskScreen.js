@@ -117,127 +117,125 @@ export default function PostTaskScreen({ navigation }) {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 30 : 30}
-        >
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => step === 1 ? navigation.goBack() : setStep(1)}>
-                    <Text style={styles.back}>← Back</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Post a Task</Text>
-                <View style={styles.stepBadge}>
-                    <Text style={styles.stepText}>Step {step}/2</Text>
-                </View>
-            </View>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 30 : 30}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => step === 1 ? navigation.goBack() : setStep(1)}>
+            <Text style={styles.back}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Post a Task</Text>
+          <View style={styles.stepBadge}>
+            <Text style={styles.stepText}>Step {step}/2</Text>
+          </View>
+        </View>
 
-            <View style={styles.stepBar}>
-                <View style={[styles.stepLine, { flex: 1, backgroundColor: COLORS.primary }]} />
-                <View style={[styles.stepLine, { flex: 1, backgroundColor: step === 2 ? COLORS.primary : COLORS.border }]} />
-            </View>
+        <View style={styles.stepBar}>
+          <View style={[styles.stepLine, { flex: 1, backgroundColor: COLORS.primary }]} />
+          <View style={[styles.stepLine, { flex: 1, backgroundColor: step === 2 ? COLORS.primary : COLORS.border }]} />
+        </View>
 
-            {step === 1 ? (
-                <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 20) }]} keyboardShouldPersistTaps="handled">
-                    <Text style={styles.sectionTitle}>📋 Task Details</Text>
+        {step === 1 && (
+            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 20) }]} keyboardShouldPersistTaps="handled">
+                <Text style={styles.label}>Title *</Text>
+                <TextInput
+                    style={[styles.input, errors.title && styles.inputError]}
+                    placeholder="e.g. Assemble IKEA shelf"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={title}
+                    onChangeText={setTitle}
+                    maxLength={60}
+                />
+                {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
 
-                    <Text style={styles.label}>Title *</Text>
-                    <TextInput
-                        style={[styles.input, errors.title && styles.inputError]}
-                        placeholder="e.g. Assemble IKEA shelf"
-                        placeholderTextColor={COLORS.textMuted}
-                        value={title}
-                        onChangeText={setTitle}
-                        maxLength={60}
-                    />
-                    {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+                <Text style={styles.label}>Description *</Text>
+                <TextInput
+                    style={[styles.input, { height: 100, textAlignVertical: 'top' }, errors.description && styles.inputError]}
+                    placeholder="Describe what you need..."
+                    placeholderTextColor={COLORS.textMuted}
+                    multiline
+                    value={description}
+                    onChangeText={setDescription}
+                />
+                {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
 
-                    <Text style={styles.label}>Description *</Text>
-                    <TextInput
-                        style={[styles.input, { height: 100, textAlignVertical: 'top' }, errors.description && styles.inputError]}
-                        placeholder="Describe what you need..."
-                        placeholderTextColor={COLORS.textMuted}
-                        multiline
-                        value={description}
-                        onChangeText={setDescription}
-                    />
-                    {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
-
-                    <Text style={styles.label}>Category *</Text>
-                    <View style={styles.categoryGrid}>
-                        {CATEGORIES.map((cat) => (
-                            <TouchableOpacity
-                                key={cat.label}
-                                style={[styles.catBtn, category === cat.label && styles.catBtnActive, errors.category && { borderColor: '#FECACA' }]}
-                                onPress={() => setCategory(cat.label)}
-                            >
-                                <Text style={styles.catEmoji}>{cat.icon}</Text>
-                                <Text style={[styles.catLabel, category === cat.label && { color: COLORS.primary, fontWeight: '700' }]}>
-                                    {cat.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                    {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
-
-                    <Text style={styles.label}>Your Budget (₹) *</Text>
-                    <TextInput
-                        style={[styles.input, errors.price && styles.inputError]}
-                        placeholder="e.g. 500"
-                        placeholderTextColor={COLORS.textMuted}
-                        keyboardType="numeric"
-                        value={price}
-                        onChangeText={setPrice}
-                    />
-                    {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
-
-                    <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
-                        <Text style={styles.nextBtnText}>Next: Set Location →</Text>
-                    </TouchableOpacity>
-                </ScrollView>
-            )}
-
-            {/* Map step — always mounted to avoid Leaflet _leaflet_events crash on remount */}
-            <View style={[styles.flex, step !== 2 && styles.hidden]}>
-                <View style={styles.mapHintBar}>
-                    {locationLoading ? (
-                        <View style={styles.locatingRow}>
-                            <ActivityIndicator size="small" color={COLORS.primary} />
-                            <Text style={styles.mapHint}>  Getting your location…</Text>
-                        </View>
-                    ) : (
-                        <Text style={styles.mapHint}>📍 Tap anywhere on the map to set task location</Text>
-                    )}
-                </View>
-
-                <MapView
-                    style={styles.map}
-                    provider={PROVIDER_DEFAULT}
-                    region={taskLocation
-                        ? { ...taskLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 }
-                        : { ...DEFAULT_LOCATION, latitudeDelta: 0.05, longitudeDelta: 0.05 }
-                    }
-                    onPress={(e) => setTaskLocation(e.nativeEvent.coordinate)}
-                    showsUserLocation={true}
-                    visible={step === 2}
-                >
-                    {taskLocation && <Marker coordinate={taskLocation} title="Task Location" />}
-                </MapView>
-
-                <View style={[styles.mapControls, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                    <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
-                        <Text style={styles.backBtnText}>← Back</Text>
-                    </TouchableOpacity>
+                <Text style={styles.label}>Category *</Text>
+                <View style={styles.categoryGrid}>
+                  {CATEGORIES.map((cat) => (
                     <TouchableOpacity
-                        style={[styles.postBtn, (loading || !taskLocation) && { opacity: 0.7 }]}
-                        onPress={handlePost}
-                        disabled={loading || !taskLocation}
+                      key={cat.label}
+                      style={[styles.catBtn, category === cat.label && styles.catBtnActive, errors.category && { borderColor: '#FECACA' }]}
+                      onPress={() => setCategory(cat.label)}
                     >
-                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.postBtnText}>🚀 Post Task</Text>}
+                      <Text style={styles.catEmoji}>{cat.icon}</Text>
+                      <Text style={[styles.catLabel, category === cat.label && { color: COLORS.primary, fontWeight: '700' }]}>{cat.label}</Text>
                     </TouchableOpacity>
+                  ))}
                 </View>
+                {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
+
+                <Text style={styles.label}>Your Budget (₹) *</Text>
+                <TextInput
+                    style={[styles.input, errors.price && styles.inputError]}
+                    placeholder="e.g. 500"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={price}
+                    onChangeText={setPrice}
+                />
+                {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
+
+                <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
+                    <Text style={styles.nextBtnText}>Next: Set Location →</Text>
+                </TouchableOpacity>
+            </ScrollView>
+        )}
+
+        {step === 2 && (
+          <View style={styles.flex}>
+            <View style={styles.mapHintBar}>
+              {locationLoading ? (
+                <View style={styles.locatingRow}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text style={styles.mapHint}>  Getting your location…</Text>
+                </View>
+              ) : (
+                <Text style={styles.mapHint}>📍 Tap anywhere on the map to set task location</Text>
+              )}
             </View>
-        </KeyboardAvoidingView>
+
+            <MapView
+              style={styles.map}
+              provider={PROVIDER_DEFAULT}
+              region={
+                taskLocation
+                  ? { ...taskLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 }
+                  : { ...DEFAULT_LOCATION, latitudeDelta: 0.05, longitudeDelta: 0.05 }
+              }
+              onPress={(e) => setTaskLocation(e.nativeEvent.coordinate)}
+              showsUserLocation={true}
+              visible={step === 2}
+            >
+              {taskLocation && <Marker coordinate={taskLocation} title="Task Location" />}
+            </MapView>
+
+            <View style={[styles.mapControls, { paddingBottom: Math.max(insets.bottom, 16) }] }>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
+                <Text style={styles.backBtnText}>← Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.postBtn, (loading || !taskLocation) && { opacity: 0.7 }]}
+                onPress={handlePost}
+                disabled={loading || !taskLocation}
+              >
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.postBtnText}>🚀 Post Task</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </KeyboardAvoidingView>
     );
 }
 
@@ -296,4 +294,3 @@ const styles = StyleSheet.create({
     postBtn: { flex: 2, backgroundColor: COLORS.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
     hidden: { display: 'none' },
 });
-

@@ -148,53 +148,62 @@ export default function PosterHomeScreen({ navigation }) {
                 ))}
             </View>
 
-            {mapView ? (
-                <View style={styles.mapWrapper}>
-                    {locationLoading && (
-                        <View style={styles.locationBanner}>
-                            <ActivityIndicator size="small" color={COLORS.primary} />
-                            <Text style={styles.locationBannerText}>  Getting your location…</Text>
-                        </View>
-                    )}
-                    <MapView ref={mapRef} style={styles.map} provider={PROVIDER_DEFAULT} region={mapRegion} showsUserLocation={!!location}>
-                        {displayedTasks.filter(t => t.location).map((task) => (
-                            <Marker
-                                key={task.id}
-                                coordinate={task.location}
-                                title={task.title}
-                                description={`₹${task.price} • ${task.status}`}
-                                pinColor={getStatusColor(task.status)}
-                                onCalloutPress={() => navigation.navigate('TaskDetail', { task })}
-                            />
-                        ))}
-                    </MapView>
-                </View>
-            ) : loading ? (
-                <View style={styles.loadingState}>
-                    <ActivityIndicator color={COLORS.primary} size="large" />
-                    <Text style={styles.loadingText}>Loading your tasks…</Text>
-                </View>
-            ) : displayedTasks.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <Text style={styles.emptyEmoji}>📭</Text>
-                    <Text style={styles.emptyTitle}>No tasks yet!</Text>
-                    <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('PostTask')}>
-                        <Text style={styles.emptyBtnText}>+ Post Your First Task</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <FlatList
-                    data={displayedTasks}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (
-                        <TaskCard
-                            task={{ ...item, onCancel: handleCancelTask }}
-                            onPress={() => navigation.navigate('TaskDetail', { task: item })}
+            <View style={styles.mapWrapper}>
+                {locationLoading && (
+                    <View style={styles.locationBanner}>
+                        <ActivityIndicator size="small" color={COLORS.primary} />
+                        <Text style={styles.locationBannerText}>  Getting your location…</Text>
+                    </View>
+                )}
+                <MapView
+                    ref={mapRef}
+                    style={styles.map}
+                    provider={PROVIDER_DEFAULT}
+                    region={mapRegion}
+                    showsUserLocation={!!location}
+                    visible={mapView}
+                >
+                    {displayedTasks.filter(t => t.location).map((task) => (
+                        <Marker
+                            key={task.id}
+                            coordinate={task.location}
+                            title={task.title}
+                            description={`₹${task.price} • ${task.status}`}
+                            pinColor={getStatusColor(task.status)}
+                            onCalloutPress={() => navigation.navigate('TaskDetail', { task })}
                         />
-                    )}
-                    contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
-                />
+                    ))}
+                </MapView>
+            </View>
+
+            {!mapView && (
+                loading ? (
+                    <View style={styles.loadingState}>
+                        <ActivityIndicator color={COLORS.primary} size="large" />
+                        <Text style={styles.loadingText}>Loading your tasks…</Text>
+                    </View>
+                ) : displayedTasks.length === 0 ? (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyEmoji}>📭</Text>
+                        <Text style={styles.emptyTitle}>No tasks yet!</Text>
+                        <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('PostTask')}>
+                            <Text style={styles.emptyBtnText}>+ Post Your First Task</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={displayedTasks}
+                        keyExtractor={(item) => item.id}
+                        renderItem={({ item }) => (
+                            <TaskCard
+                                task={{ ...item, onCancel: handleCancelTask }}
+                                onPress={() => navigation.navigate('TaskDetail', { task: item })}
+                            />
+                        )}
+                        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
+                    />
+                )
             )}
 
             {!mapView && (
