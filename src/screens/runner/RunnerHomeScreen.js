@@ -172,8 +172,8 @@ export default function RunnerHomeScreen({ navigation }) {
                 </Text>
             </View>
 
-            {mapView ? (
-                <View style={[styles.mapWrapper, { display: mapView ? 'flex' : 'none' }]}> 
+            {mapView && (
+                <View style={styles.mapWrapper}>
                     {locationLoading && (
                         <View style={styles.locationBanner}>
                             <ActivityIndicator size="small" color={COLORS.primary} />
@@ -187,25 +187,12 @@ export default function RunnerHomeScreen({ navigation }) {
                                 coordinate={task.location}
                                 title={task.title}
                                 description={`₹${task.price} • ${task.category}`}
-            <View style={[styles.mapWrapper, { display: mapView ? 'flex' : 'none' }]}>
-                {locationLoading && (
-                    <View style={styles.locationBanner}>
-                        <ActivityIndicator size="small" color={COLORS.primary} />
-                        <Text style={styles.locationBannerText}>  Getting your location…</Text>
-                    </View>
-                )}
-                <MapView style={styles.map} provider={PROVIDER_DEFAULT} region={mapRegion} showsUserLocation={!!location}>
-                    {filtered.filter(t => t.location).map(task => (
-                        <Marker
-                            key={task.id}
-                            coordinate={task.location}
-                            title={task.title}
-                            description={`₹${task.price} • ${task.category}`}
-                            onCalloutPress={() => navigation.navigate('TaskDetail', { task })}
-                        />
-                    ))}
-                </MapView>
-            </View>
+                                onCalloutPress={() => navigation.navigate('TaskDetail', { task })}
+                            />
+                        ))}
+                    </MapView>
+                </View>
+            )}
 
             {!mapView && (loading ? (
                 <View style={styles.loadingState}>
@@ -238,7 +225,7 @@ export default function RunnerHomeScreen({ navigation }) {
                         </TouchableOpacity>
                     )}
                 />
-            )}
+            ))}
         </View>
     );
 }
