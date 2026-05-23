@@ -1,13 +1,12 @@
 // src/utils/location.js
 /**
  * useUserLocation custom hook.
- * Extracts location logic with race-condition handling and timeouts.
+ * Returns the user's real GPS location (or null if unavailable/denied).
+ * ✅ Fix 3: No hardcoded city — components must handle null location gracefully.
  */
 import { useState } from 'react';
 import React from 'react';
 import * as Location from 'expo-location';
-
-const DEFAULT_LOCATION = { latitude: 12.9716, longitude: 77.5946 }; // Bengaluru Fallback
 
 export function useUserLocation() {
     const [location, setLocation] = useState(null);
@@ -20,17 +19,17 @@ export function useUserLocation() {
             try {
                 const { status } = await Location.requestForegroundPermissionsAsync();
                 if (status !== 'granted') {
-                    if (!isCancelled) {
-                        setLocation(DEFAULT_LOCATION);
-                        setLocationLoading(false);
-                    }
+                    // Permission denied — leave location as null (no city hardcoding)
+                    if (!isCancelled) setLocationLoading(false);
                     return;
                 }
 
                 // Race current position against a timeout to prevent infinite hanging
                 const loc = await Promise.race([
                     Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('timeout')), 8000)
+                    ),
                 ]);
 
                 if (!isCancelled) {
@@ -40,8 +39,8 @@ export function useUserLocation() {
                     });
                 }
             } catch (err) {
-                // Fallback to default on timeout or error
-                if (!isCancelled) setLocation(DEFAULT_LOCATION);
+                // Timeout or error — set null so UI shows country-level map or prompts user
+                if (!isCancelled) setLocation(null);
             } finally {
                 if (!isCancelled) setLocationLoading(false);
             }

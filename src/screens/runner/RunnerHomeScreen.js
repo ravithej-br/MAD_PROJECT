@@ -1,7 +1,7 @@
 // src/screens/runner/RunnerHomeScreen.js
 /**
  * Runner Home Screen to browse available tasks.
- * Refactored: Added pagination, server-side sorting, Zustand store integration, and shared utilities.
+ * Fixes: map tiles, location search bar, removed Bangalore hardcoding.
  */
 import React, { useState, useCallback } from 'react';
 import {
@@ -21,12 +21,8 @@ import { showAlert } from '../../utils/alert';
 const CATEGORIES = ['All', 'Assembly', 'Dog Walk', 'Delivery', 'Cleaning', 'Shopping', 'Repairs', 'Tech Help'];
 const PAGE_SIZE = 10;
 
-const DEFAULT_REGION = {
-    latitude: 12.9716,
-    longitude: 77.5946,
-    latitudeDelta: 0.1,
-    longitudeDelta: 0.1,
-};
+// ✅ Fix 3: No hardcoded city — region comes entirely from GPS via useUserLocation.
+// Only used as absolute last resort if GPS is unavailable AND no tasks have a location.
 
 export default function RunnerHomeScreen({ navigation }) {
     const { user } = useAuthStore();
@@ -39,6 +35,11 @@ export default function RunnerHomeScreen({ navigation }) {
     const [mapView, setMapView] = useState(false);
     const [selectedCat, setSelectedCat] = useState('All');
     const [search, setSearch] = useState('');
+
+    // ✅ Fix 2: Map location search state
+    const [mapSearch, setMapSearch] = useState('');         // input text
+    const [mapSearchQuery, setMapSearchQuery] = useState(''); // submitted query → triggers geocode
+
     const [lastDoc, setLastDoc] = useState(null);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -56,11 +57,11 @@ export default function RunnerHomeScreen({ navigation }) {
             list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setTasks(list);
             setLastDoc(snap.docs[snap.docs.length - 1]);
-            setHasMore(snap.docs.length >= PAGE_SIZE); // Approximation without limit
+            setHasMore(snap.docs.length >= PAGE_SIZE);
             setLoading(false);
             setRefreshing(false);
         }, (err) => {
-            console.error("Firestore Error:", err);
+            console.error('Firestore Error:', err);
             showAlert('Database Error', 'Could not fetch tasks. This might be due to missing indexes or permissions.');
             setLoading(false);
             setRefreshing(false);
@@ -81,7 +82,6 @@ export default function RunnerHomeScreen({ navigation }) {
                 startAfter(lastDoc),
                 limit(PAGE_SIZE)
             );
-            
             const snap = await getDocs(q);
             if (!snap.empty) {
                 const newList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -98,7 +98,7 @@ export default function RunnerHomeScreen({ navigation }) {
         }
     };
 
-    // ✅ Filtering (Client-side search/category over the fetched pool)
+    // ✅ Client-side filtering
     React.useEffect(() => {
         let list = tasks;
         if (user) {
@@ -114,13 +114,19 @@ export default function RunnerHomeScreen({ navigation }) {
         setLoading(true);
         setLastDoc(null);
         setHasMore(true);
-        // Initial useEffect will handle the first page re-fetch via setRefreshing reset or store update
     }, []);
 
-
+    // ✅ Fix 3: mapRegion is purely GPS-driven; no Bangalore hardcoding
     const mapRegion = location
         ? { latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.08, longitudeDelta: 0.08 }
-        : DEFAULT_REGION;
+        : null; // MapView handles null gracefully with a country-level fallback
+
+    // ✅ Fix 2: Submit location search
+    const handleMapSearch = () => {
+        if (mapSearch.trim()) {
+            setMapSearchQuery(mapSearch.trim());
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -134,15 +140,33 @@ export default function RunnerHomeScreen({ navigation }) {
                 </TouchableOpacity>
             </View>
 
-            <View style={styles.searchRow}>
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="🔍 Search tasks..."
-                    placeholderTextColor={COLORS.textMuted}
-                    value={search}
-                    onChangeText={setSearch}
-                />
-            </View>
+            {/* ✅ Fix 2: Show location search bar in map mode, task search in list mode */}
+            {mapView ? (
+                <View style={styles.searchRow}>
+                    <TextInput
+                        style={[styles.searchInput, { flex: 1 }]}
+                        placeholder="📍 Search location (e.g. Koramangala, Mumbai)..."
+                        placeholderTextColor={COLORS.textMuted}
+                        value={mapSearch}
+                        onChangeText={setMapSearch}
+                        onSubmitEditing={handleMapSearch}
+                        returnKeyType="search"
+                    />
+                    <TouchableOpacity style={styles.searchBtn} onPress={handleMapSearch}>
+                        <Text style={styles.searchBtnText}>Go</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <View style={styles.searchRow}>
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="🔍 Search tasks..."
+                        placeholderTextColor={COLORS.textMuted}
+                        value={search}
+                        onChangeText={setSearch}
+                    />
+                </View>
+            )}
 
             {!mapView && (
                 <FlatList
@@ -180,7 +204,14 @@ export default function RunnerHomeScreen({ navigation }) {
                             <Text style={styles.locationBannerText}>  Getting your location…</Text>
                         </View>
                     )}
-                    <MapView style={styles.map} provider={PROVIDER_DEFAULT} region={mapRegion} showsUserLocation={!!location}>
+                    {/* ✅ Fix 1: MapView now uses OSM tiles; Fix 2: searchQuery prop; Fix 3: region is GPS-only */}
+                    <MapView
+                        style={styles.map}
+                        provider={PROVIDER_DEFAULT}
+                        region={mapRegion}
+                        showsUserLocation={!!location}
+                        searchQuery={mapSearchQuery}
+                    >
                         {filtered.filter(t => t.location).map(task => (
                             <Marker
                                 key={task.id}
@@ -244,12 +275,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: COLORS.primary + '40',
     },
     mapToggleText: { fontWeight: '700', color: COLORS.primary, fontSize: 13 },
-    searchRow: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: COLORS.card },
+    searchRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        paddingHorizontal: 16, paddingVertical: 10, backgroundColor: COLORS.card,
+    },
     searchInput: {
-        backgroundColor: COLORS.background, borderRadius: 12, paddingHorizontal: 14,
+        flex: 1, backgroundColor: COLORS.background, borderRadius: 12, paddingHorizontal: 14,
         paddingVertical: 10, fontSize: 14, color: COLORS.text,
         borderWidth: 1, borderColor: COLORS.border,
     },
+    searchBtn: {
+        backgroundColor: COLORS.primary, borderRadius: 10,
+        paddingHorizontal: 14, paddingVertical: 10,
+    },
+    searchBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
     catList: { paddingHorizontal: 16, paddingVertical: 10, gap: 8, backgroundColor: COLORS.card, alignItems: 'center' },
     catChip: {
         paddingHorizontal: 16, height: 34, justifyContent: 'center', borderRadius: 20,
@@ -276,4 +315,3 @@ const styles = StyleSheet.create({
     loadMoreBtn: { padding: 16, alignItems: 'center' },
     loadMoreText: { color: COLORS.primary, fontWeight: '700' },
 });
-
