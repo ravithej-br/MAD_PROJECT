@@ -1,189 +1,172 @@
-// src/components/MapView.web.js
-import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import {
-    MapContainer, TileLayer,
-    Marker as LeafletMarker, Polyline as LeafletPolyline,
-    Popup as LeafletPopup, useMapEvents, useMap
-} from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+// src/components/MapView.web.js - Google Maps for web (Vercel)
+import React from 'react';
+import { View, StyleSheet, Text } from 'react-native';
+import { GoogleMap, LoadScript, Marker as GoogleMarker, InfoWindow, Polyline as GooglePolyline } from '@react-google-maps/api';
 
-// Fix for default Leaflet icon not appearing in bundled environments by using dynamic SVG data URIs
-const getSvgIconUrl = (color) => {
-    const svgString = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="36" height="36">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/>
-        </svg>
-    `.trim();
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+
+const mapContainerStyle = {
+    width: '100%',
+    height: '100%',
 };
 
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconUrl: getSvgIconUrl('#4F46E5'),
-    iconRetinaUrl: getSvgIconUrl('#4F46E5'),
-    iconSize: [36, 36],
-    iconAnchor: [18, 36],
-    popupAnchor: [0, -36],
-    shadowUrl: null,
-    shadowSize: null,
-});
+const defaultCenter = {
+    lat: 12.9716,
+    lng: 77.5946,
+};
 
-// Inner component: handles map clicks and syncs region changes safely
-function MapController({ onPress, region, visible }) {
-    const map = useMap();
-    const [isReady, setIsReady] = useState(false);
+const mapOptions = {
+    zoom: 14,
+    gestureHandling: 'greedy',
+    zoomControl: true,
+};
 
-    // Wait for map to be fully ready
-    React.useEffect(() => {
-        if (!map) return;
-        try {
-            if (map.isLoading && map.isLoading()) {
-                map.whenReady(() => setIsReady(true));
-            } else {
-                setIsReady(true);
-            }
-        } catch (e) {
-            setIsReady(false);
-        }
-    }, [map]);
+const GoogleMapComponent = ({ children, style, region, onPress, showsUserLocation, visible = true }) => {
+    const [map, setMap] = React.useState(null);
+    const mapRef = React.useRef(null);
 
-    // Invalidate size when visible (using safer approach)
-    React.useEffect(() => {
-        if (!visible || !isReady || !map) return;
-        // Skip invalidateSize on web to prevent initialization issues
-        // The map renders fine without it
-    }, [visible, isReady, map]);
-
-    // Sync map center when region prop changes
-    React.useEffect(() => {
-        if (!region || !isReady || !map) return;
-        try {
-            const currentCenter = map.getCenter();
-            const lat = region.latitude;
-            const lng = region.longitude;
-            // Only pan if there's a meaningful difference (avoids jitter)
-            if (
-                Math.abs(currentCenter.lat - lat) > 0.0001 ||
-                Math.abs(currentCenter.lng - lng) > 0.0001
-            ) {
-                map.setView([lat, lng], map.getZoom(), { animate: true, duration: 0.5 });
-            }
-        } catch (e) {
-            // Map container may have been removed; ignore
-        }
-    }, [region?.latitude, region?.longitude, isReady, map]);
-
-    useMapEvents({
-        click(e) {
-            if (onPress) {
-                try {
-                    onPress({
-                        nativeEvent: {
-                            coordinate: {
-                                latitude: e.latlng.lat,
-                                longitude: e.latlng.lng,
-                            }
-                        }
-                    });
-                } catch (e) {
-                    // ignore
-                }
-            }
-        },
-    });
-
-    return null;
-}
-
-const MapView = ({ children, style, region, onPress, showsUserLocation, visible = true }) => {
     const center = region
-        ? [region.latitude, region.longitude]
-        : [12.9716, 77.5946];
+        ? { lat: region.latitude, lng: region.longitude }
+        : defaultCenter;
 
     const zoom = region?.latitudeDelta
         ? Math.round(Math.log2(360 / region.latitudeDelta)) - 1
         : 14;
 
+    const handleMapClick = (event) => {
+        if (onPress) {
+            onPress({
+                nativeEvent: {
+                    coordinate: {
+                        latitude: event.latLng.lat(),
+                        longitude: event.latLng.lng(),
+                    }
+                }
+            });
+        }
+    };
+
+    const handleMapLoad = (map) => {
+        setMap(map);
+        mapRef.current = map;
+    };
+
+    React.useEffect(() => {
+        if (map && region) {
+            map.panTo({
+                lat: region.latitude,
+                lng: region.longitude,
+            });
+            map.setZoom(Math.max(10, Math.min(zoom, 18)));
+        }
+    }, [region?.latitude, region?.longitude, map, zoom]);
+
+    if (!GOOGLE_MAPS_API_KEY) {
+        return (
+            <View style={[style, styles.container]}>
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>
+                        Google Maps API key not configured. Add EXPO_PUBLIC_GOOGLE_MAPS_API_KEY to .env
+                    </Text>
+                </View>
+            </View>
+        );
+    }
+
     return (
         <View style={[style, styles.container]}>
-            <MapContainer
-                center={center}
-                zoom={Math.max(10, Math.min(zoom, 18))}
-                style={{ height: '100%', width: '100%' }}
-                scrollWheelZoom={true}
-                // Stable key prevents re-creation; we rely on invalidateSize for reflow instead
-            >
-                <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    maxZoom={19}
-                    keepBuffer={4}
-                />
-                <MapController onPress={onPress} region={region} visible={visible} />
-                {children}
-            </MapContainer>
+            <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY}>
+                <GoogleMap
+                    mapContainerStyle={mapContainerStyle}
+                    center={center}
+                    zoom={Math.max(10, Math.min(zoom, 18))}
+                    options={mapOptions}
+                    onClick={handleMapClick}
+                    onLoad={handleMapLoad}
+                >
+                    {children}
+                </GoogleMap>
+            </LoadScript>
         </View>
     );
 };
 
-// Wrapper for Marker to match react-native-maps API
+// Marker wrapper to match react-native-maps API
 export const Marker = ({ coordinate, title, description, pinColor, onCalloutPress }) => {
     if (!coordinate) return null;
 
-    const icon = pinColor ? L.icon({
-        iconUrl: getSvgIconUrl(pinColor),
-        iconSize: [36, 36],
-        iconAnchor: [18, 36],
-        popupAnchor: [0, -36],
-    }) : undefined;
+    const [infoOpen, setInfoOpen] = React.useState(false);
+    const markerColor = pinColor ? pinColor.replace('#', '') : '4F46E5';
 
     return (
-        <LeafletMarker position={[coordinate.latitude, coordinate.longitude]} icon={icon}>
-            {(title || description) && (
-                <LeafletPopup>
-                    <div style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', padding: '2px', minWidth: '150px' }}>
-                        {title && <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px', color: '#1E293B' }}>{title}</div>}
-                        {description && <div style={{ fontSize: '12px', color: '#64748B', marginBottom: onCalloutPress ? '8px' : '0' }}>{description}</div>}
+        <GoogleMarker
+            position={{ lat: coordinate.latitude, lng: coordinate.longitude }}
+            title={title}
+            onClick={() => setInfoOpen(true)}
+            icon={{
+                path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+                fillColor: `#${markerColor}`,
+                fillOpacity: 1,
+                strokeColor: '#fff',
+                strokeWeight: 2,
+                scale: 1.5,
+            }}
+        >
+            {infoOpen && (
+                <InfoWindow onCloseClick={() => setInfoOpen(false)}>
+                    <div style={{ padding: '8px', minWidth: '150px', fontFamily: 'system-ui' }}>
+                        {title && <div style={{ fontWeight: 'bold', marginBottom: '4px', color: '#1E293B' }}>{title}</div>}
+                        {description && <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>{description}</div>}
                         {onCalloutPress && (
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    if (onCalloutPress) onCalloutPress();
+                                    onCalloutPress();
                                 }}
                                 style={{
                                     width: '100%',
                                     padding: '6px 10px',
                                     backgroundColor: '#4F46E5',
-                                    color: '#FFFFFF',
+                                    color: '#fff',
                                     border: 'none',
-                                    borderRadius: '6px',
+                                    borderRadius: '4px',
                                     cursor: 'pointer',
                                     fontSize: '12px',
                                     fontWeight: '600',
-                                    textAlign: 'center',
-                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                                 }}
                             >
                                 View Details
                             </button>
                         )}
                     </div>
-                </LeafletPopup>
+                </InfoWindow>
             )}
-        </LeafletMarker>
+        </GoogleMarker>
     );
 };
 
-// Wrapper for Polyline to match react-native-maps API
+// Polyline wrapper to match react-native-maps API
 export const Polyline = ({ coordinates, strokeColor, strokeWidth }) => {
     if (!coordinates || coordinates.length < 2) return null;
-    const positions = coordinates.map(c => [c.latitude, c.longitude]);
-    return <LeafletPolyline positions={positions} color={strokeColor} weight={strokeWidth} />;
+    const positions = coordinates.map(c => ({
+        lat: c.latitude,
+        lng: c.longitude,
+    }));
+    return (
+        <GooglePolyline
+            path={positions}
+            options={{
+                strokeColor: strokeColor || '#4F46E5',
+                strokeWeight: strokeWidth || 3,
+                geodesic: true,
+            }}
+        />
+    );
 };
 
-export const PROVIDER_DEFAULT = 'default';
+export const PROVIDER_DEFAULT = 'google';
+
+export default GoogleMapComponent;
 
 const styles = StyleSheet.create({
     container: {
@@ -192,7 +175,18 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#E2E8F0',
-    }
+    },
+    errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: '#FEF2F2',
+    },
+    errorText: {
+        color: '#EF4444',
+        fontSize: 14,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
 });
-
-export default MapView;
