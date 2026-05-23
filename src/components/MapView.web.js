@@ -52,16 +52,8 @@ function MapController({ onPress, region, visible }) {
     // Invalidate size when visible (using safer approach)
     React.useEffect(() => {
         if (!visible || !isReady || !map) return;
-        const timer = setTimeout(() => {
-            try {
-                if (map && map._container && map.invalidateSize) {
-                    map.invalidateSize();
-                }
-            } catch (e) {
-                // ignore
-            }
-        }, 100);
-        return () => clearTimeout(timer);
+        // Skip invalidateSize on web to prevent initialization issues
+        // The map renders fine without it
     }, [visible, isReady, map]);
 
     // Sync map center when region prop changes
