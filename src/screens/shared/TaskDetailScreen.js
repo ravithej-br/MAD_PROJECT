@@ -11,7 +11,9 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from '../../components/MapView';
 import { doc, onSnapshot, updateDoc, getDoc, serverTimestamp, arrayUnion, increment } from 'firebase/firestore';
 import * as Location from 'expo-location';
-import { db } from '../../config/firebase';
+import * as ImagePicker from 'expo-image-picker';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import useTaskStore from '../../store/useTaskStore';
 import { COLORS, SHADOWS } from '../../utils/theme';
@@ -38,6 +40,8 @@ export default function TaskDetailScreen({ route, navigation }) {
     const [ratingSelected, setRatingSelected] = useState(0);
     const [feedback, setFeedback] = useState('');
     const [toast, setToast] = useState(null);
+    const [runnerCompletionImage, setRunnerCompletionImage] = useState(null);
+    const [imageUploading, setImageUploading] = useState(false);
 
     // ✅ Toast Auto-Dismiss
     React.useEffect(() => {
@@ -197,6 +201,50 @@ export default function TaskDetailScreen({ route, navigation }) {
         }
     };
 
+    const pickRunnerCompletionImage = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                showAlert('Permission Required', 'Camera roll permission needed.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.7,
+            });
+
+            if (!result.canceled) {
+                setRunnerCompletionImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            showAlert('Error', 'Failed to pick image');
+        }
+    };
+
+    const uploadRunnerCompletionImage = async (imageUri) => {
+        try {
+            setImageUploading(true);
+            const response = await fetch(imageUri);
+            const blob = await response.blob();
+            
+            const filename = `completions/${user.uid}/${task.id}/${Date.now()}.jpg`;
+            const storageRef = ref(storage, filename);
+            
+            await uploadBytes(storageRef, blob);
+            const downloadURL = await getDownloadURL(storageRef);
+            
+            setImageUploading(false);
+            return downloadURL;
+        } catch (error) {
+            setImageUploading(false);
+            console.error('Image upload error:', error);
+            throw error;
+        }
+    };
+
     const st = STATUS_CONFIG[task.status] || STATUS_CONFIG.open;
     const rawDist = task.runnerLocation && task.location ? getDistance(task.runnerLocation, task.location, true) : null;
     const formattedDist = task.runnerLocation && task.location ? getDistance(task.runnerLocation, task.location) : null;
@@ -257,6 +305,13 @@ export default function TaskDetailScreen({ route, navigation }) {
                     </View>
                 )}
 
+                {task.completionImageURL && (
+                    <View style={styles.completionImageCard}>
+                        <Text style={styles.completionImageLabel}>📸 Completion Proof</Text>
+                        <Image source={{ uri: task.completionImageURL }} style={styles.taskImage} />
+                    </View>
+                )}
+
                 <View style={styles.infoSection}>
                     <View style={styles.topLine}>
                         <Text style={styles.category}>{task.category}</Text>
@@ -277,7 +332,55 @@ export default function TaskDetailScreen({ route, navigation }) {
                                 </View>
                             )}
                             {role === 'runner' && task.status === 'in-progress' && task.runnerId === user.uid && (
-                                <TouchableOpacity style={styles.completeBtn} onPress={() => updateStatus('completed')}><Text style={styles.completeBtnText}>Mark as Completed ✓</Text></TouchableOpacity>
+                                <View>
+                                    <View style={styles.completionImageSection}>
+                                        <Text style={styles.label}>📸 Add Proof Photo (Optional)</Text>
+                                        <TouchableOpacity style={styles.imageUploadBtn} onPress={pickRunnerCompletionImage}>
+                                            <Text style={styles.imageUploadText}>
+                                                {runnerCompletionImage ? '✅ Photo Added' : '📷 Choose Photo'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        {runnerCompletionImage && (
+                                            <View style={styles.imagePreview}>
+                                                <Image source={{ uri: runnerCompletionImage }} style={styles.previewImage} />
+                                                <TouchableOpacity 
+                                                    onPress={() => setRunnerCompletionImage(null)}
+                                                    style={styles.removeImageBtn}
+                                                >
+                                                    <Text style={styles.removeImageText}>✕ Remove</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <TouchableOpacity 
+                                        style={[styles.completeBtn, (loading || imageUploading) && { opacity: 0.6 }]}
+                                        onPress={async () => {
+                                            let completionImageURL = null;
+                                            if (runnerCompletionImage) {
+                                                setLoading(true);
+                                                try {
+                                                    completionImageURL = await uploadRunnerCompletionImage(runnerCompletionImage);
+                                                } catch (err) {
+                                                    showAlert('Error', 'Failed to upload image');
+                                                    setLoading(false);
+                                                    return;
+                                                }
+                                            }
+                                            await updateDoc(doc(db, 'tasks', task.id), { 
+                                                completedAt: serverTimestamp(),
+                                                completionImageURL: completionImageURL 
+                                            });
+                                            setRunnerCompletionImage(null);
+                                        }}
+                                        disabled={loading || imageUploading}
+                                    >
+                                        {loading || imageUploading ? (
+                                            <ActivityIndicator color="#fff" />
+                                        ) : (
+                                            <Text style={styles.completeBtnText}>Mark as Completed ✓</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
                             )}
                             {role === 'poster' && task.status === 'completed' && (
                                 <TouchableOpacity style={styles.approveBtn} onPress={() => updateStatus('approved')}><Text style={styles.approveBtnText}>Approve & Release Payment 💰</Text></TouchableOpacity>
@@ -345,5 +448,26 @@ const styles = StyleSheet.create({
     },
     toastText: { color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14 },
     imageCard: { borderRadius: 20, overflow: 'hidden', ...SHADOWS.card, marginBottom: 20 },
+    completionImageCard: { borderRadius: 20, overflow: 'hidden', ...SHADOWS.card, marginBottom: 20, backgroundColor: COLORS.card, padding: 12 },
+    completionImageLabel: { fontSize: 14, fontWeight: '700', color: COLORS.success, marginBottom: 8 },
     taskImage: { width: '100%', height: 250, backgroundColor: COLORS.card },
+    completionImageSection: { marginBottom: 16, backgroundColor: COLORS.card, borderRadius: 12, padding: 16 },
+    imageUploadBtn: {
+        backgroundColor: COLORS.background, borderRadius: 12, padding: 16,
+        borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed',
+        alignItems: 'center', marginBottom: 12,
+    },
+    imageUploadText: { fontSize: 15, color: COLORS.primary, fontWeight: '600' },
+    imagePreview: {
+        marginBottom: 8, alignItems: 'center',
+    },
+    previewImage: {
+        width: '100%', height: 150, borderRadius: 12, marginBottom: 8,
+        backgroundColor: COLORS.card,
+    },
+    removeImageBtn: {
+        paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FEE2E2', borderRadius: 6,
+    },
+    removeImageText: { color: '#EF4444', fontWeight: '600', fontSize: 12 },
+    label: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted, marginBottom: 8 },
 });

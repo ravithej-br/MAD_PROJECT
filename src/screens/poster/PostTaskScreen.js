@@ -41,6 +41,35 @@ const geocodeAddress = async (address) => {
     }
 };
 
+// Popular Bangalore areas with coordinates
+const BANGALORE_LOCATIONS = [
+    { name: 'Basavangudi', lat: 12.9352, lng: 77.5808 },
+    { name: 'Bommasandra', lat: 12.7391, lng: 77.5733 },
+    { name: 'Koramangala', lat: 12.9352, lng: 77.6245 },
+    { name: 'Indiranagar', lat: 12.9716, lng: 77.6412 },
+    { name: 'Whitefield', lat: 12.9698, lng: 77.7499 },
+    { name: 'Jayanagar', lat: 12.9352, lng: 77.5946 },
+    { name: 'Bannerghatta', lat: 12.8599, lng: 77.6245 },
+    { name: 'Marathahalli', lat: 12.9695, lng: 77.7076 },
+    { name: 'Sarjapur', lat: 12.7639, lng: 77.6704 },
+    { name: 'Electronic City', lat: 12.8389, lng: 77.6660 },
+    { name: 'Silk Board', lat: 12.9451, lng: 77.6245 },
+    { name: 'HSR Layout', lat: 12.9352, lng: 77.6245 },
+    { name: 'Vivek Nagar', lat: 12.9352, lng: 77.5946 },
+    { name: 'Yeshwantpur', lat: 13.0368, lng: 77.5737 },
+    { name: 'Rajajinagar', lat: 13.0012, lng: 77.5735 },
+    { name: 'Malleswaram', lat: 13.0012, lng: 77.5900 },
+    { name: 'Frazer Town', lat: 13.0012, lng: 77.6012 },
+    { name: 'Shivajinagar', lat: 13.0012, lng: 77.5946 },
+    { name: 'Vijayanagar', lat: 13.0100, lng: 77.5500 },
+    { name: 'Cantonment', lat: 12.9716, lng: 77.5946 },
+    { name: 'JP Nagar', lat: 12.8844, lng: 77.5989 },
+    { name: 'Magadi Road', lat: 12.8844, lng: 77.5500 },
+    { name: 'Banasavakya', lat: 12.8500, lng: 77.5500 },
+    { name: 'Kengeri', lat: 12.8844, lng: 77.4500 },
+    { name: 'Andrahalli', lat: 12.8844, lng: 77.5989 },
+];
+
 const isWithinBangalore = (lat, lng) => {
     return lat >= BANGALORE_BOUNDS.minLat && lat <= BANGALORE_BOUNDS.maxLat &&
            lng >= BANGALORE_BOUNDS.minLng && lng <= BANGALORE_BOUNDS.maxLng;
@@ -428,7 +457,7 @@ export default function PostTaskScreen({ navigation }) {
               showsUserLocation={true}
               visible={step === 2}
             >
-              {taskLocation && <Marker coordinate={taskLocation} title="📍 Task Location" />}
+              {taskLocation && <Marker coordinate={taskLocation} title="📍 Task Location" pinColor="#10B981" />}
             </MapView>
 
             <View style={[styles.mapControls, { paddingBottom: Math.max(insets.bottom, 16) }] }>
