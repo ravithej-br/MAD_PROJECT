@@ -54,10 +54,20 @@ export default function PostTaskScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [locationError, setLocationError] = useState('');
 
     // Validation Errors
     const [errors, setErrors] = useState({});
+
+    // Debounce search - only update map after user stops typing for 1 second
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     // Initialize taskLocation when userLoc is fetched
     React.useEffect(() => {
@@ -222,13 +232,18 @@ export default function PostTaskScreen({ navigation }) {
           <View style={styles.flex}>
             <View style={styles.mapHintBar}>
               <Text style={styles.label}>📍 Search Location (Optional)</Text>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="e.g. Koramangala, Bangalore"
-                placeholderTextColor={COLORS.textMuted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
+              <View style={styles.searchContainer}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="e.g. Koramangala, Bangalore"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery && searchQuery !== debouncedSearchQuery && (
+                  <Text style={styles.searchingText}>Searching...</Text>
+                )}
+              </View>
             </View>
 
             <View style={styles.instructionBar}>
@@ -254,7 +269,7 @@ export default function PostTaskScreen({ navigation }) {
               onPress={(e) => handleLocationTap(e.nativeEvent.coordinate)}
               showsUserLocation={true}
               visible={step === 2}
-              searchQuery={searchQuery}
+              searchQuery={debouncedSearchQuery}
             >
               {taskLocation && <Marker coordinate={taskLocation} title="📍 Task Location" />}
             </MapView>
@@ -317,10 +332,16 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card, paddingHorizontal: 16, paddingVertical: 12,
         borderBottomWidth: 1, borderBottomColor: COLORS.border,
     },
+    searchContainer: {
+        marginTop: 8,
+    },
     searchInput: {
         backgroundColor: COLORS.background, borderRadius: 10, padding: 12,
-        fontSize: 14, color: COLORS.text, marginTop: 8,
+        fontSize: 14, color: COLORS.text,
         borderWidth: 1, borderColor: COLORS.border,
+    },
+    searchingText: {
+        fontSize: 11, color: COLORS.primary, marginTop: 6, fontWeight: '500',
     },
     instructionBar: {
         backgroundColor: COLORS.card, paddingHorizontal: 16, paddingVertical: 12,
