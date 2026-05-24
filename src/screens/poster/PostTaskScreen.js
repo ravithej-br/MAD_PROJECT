@@ -41,6 +41,23 @@ const geocodeAddress = async (address) => {
     }
 };
 
+const reverseGeocodeLocation = async (latitude, longitude) => {
+    try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`;
+        const response = await fetch(url, {
+            headers: { 'Accept-Language': 'en', 'User-Agent': 'TaskHub/1.0' },
+        });
+        const data = await response.json();
+        if (!data || !data.address) return null;
+
+        const address = data.address;
+        return address.neighbourhood || address.suburb || address.city_district || address.city || address.town || address.village || data.display_name || null;
+    } catch (error) {
+        console.log('Reverse geocoding error:', error);
+        return null;
+    }
+};
+
 // Popular Bangalore areas with coordinates
 const BANGALORE_LOCATIONS = [
     { name: 'Basavangudi', lat: 12.9352, lng: 77.5808 },
@@ -105,6 +122,7 @@ export default function PostTaskScreen({ navigation }) {
     const [price, setPrice] = useState('');
     const [category, setCategory] = useState(null);
     const [taskLocation, setTaskLocation] = useState(null);
+    const [locationName, setLocationName] = useState('');
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(1);
     const [locationError, setLocationError] = useState('');
@@ -158,7 +176,7 @@ export default function PostTaskScreen({ navigation }) {
         }
     };
 
-    const handleLocationTap = (coordinate) => {
+    const handleLocationTap = async (coordinate) => {
         const { latitude, longitude } = coordinate;
         if (!isWithinBangalore(latitude, longitude)) {
             setLocationError('Location must be within Bangalore metro area');
@@ -166,6 +184,14 @@ export default function PostTaskScreen({ navigation }) {
         }
         setLocationError('');
         setTaskLocation(coordinate);
+        setLocationName('Fetching address...');
+
+        const address = await reverseGeocodeLocation(latitude, longitude);
+        if (address) {
+            setLocationName(address);
+        } else {
+            setLocationName('Bangalore location');
+        }
     };
 
     const pickImage = async () => {
@@ -223,46 +249,41 @@ export default function PostTaskScreen({ navigation }) {
             showAlert('No Location', 'Please set a location on the map.');
             return;
         }
+        if (!user?.uid) {
+            showAlert('Sign in required', 'Please log in before posting tasks.');
+            return;
+        }
+
         setLoading(true);
         try {
             let imageURL = null;
             
-            // Upload image if selected
             if (taskImage) {
                 try {
                     imageURL = await uploadImage(taskImage);
                 } catch (imgErr) {
                     console.error('Image upload failed:', imgErr);
-                    // Continue even if image upload fails
                     showAlert('Warning', 'Image upload failed, but task will be posted without image.');
                 }
             }
-            
-            console.log('Posting task with data:', {
+
+            const taskPayload = {
                 title: title.trim(),
                 description: description.trim(),
                 price: parseFloat(price),
                 category,
                 location: taskLocation,
-                imageURL,
-                status: 'open',
-                posterId: user.uid,
-            });
-            
-            await addDoc(collection(db, 'tasks'), {
-                title: title.trim(),
-                description: description.trim(),
-                price: parseFloat(price),
-                category,
-                location: taskLocation,
+                locationName: locationName || 'Bangalore location',
                 imageURL,
                 status: 'open',
                 posterId: user.uid,
                 runnerId: null,
                 createdAt: serverTimestamp(),
-            });
-            
-            setLoading(false);
+            };
+
+            console.log('Posting task with data:', taskPayload);
+            await addDoc(collection(db, 'tasks'), taskPayload);
+
             showAlert('🎉 Task Posted!', 'Your task is live. Runners near you will see it.', [
                 { text: 'OK', onPress: () => {
                     setTitle('');
@@ -270,6 +291,7 @@ export default function PostTaskScreen({ navigation }) {
                     setPrice('');
                     setCategory(null);
                     setTaskLocation(null);
+                    setLocationName('');
                     setTaskImage(null);
                     setStep(1);
                     navigation.goBack();
@@ -277,8 +299,9 @@ export default function PostTaskScreen({ navigation }) {
             ]);
         } catch (err) {
             console.error('Post error:', err);
-            setLoading(false);
             showAlert('Error Posting Task', err.message || 'Failed to post task. Check internet connection.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -404,8 +427,13 @@ export default function PostTaskScreen({ navigation }) {
                 <>
                   <Text style={styles.locationInfoLabel}>Selected location</Text>
                   <Text style={styles.locationInfoText}>
-                    {taskLocation.latitude.toFixed(5)}, {taskLocation.longitude.toFixed(5)}
+                    {locationName || `${taskLocation.latitude.toFixed(5)}, ${taskLocation.longitude.toFixed(5)}`}
                   </Text>
+                  {locationName ? (
+                    <Text style={styles.locationCoordinateText}>
+                      {taskLocation.latitude.toFixed(5)}, {taskLocation.longitude.toFixed(5)}
+                    </Text>
+                  ) : null}
                 </>
               ) : (
                 <Text style={styles.locationInfoPlaceholder}>Tap anywhere on the map to mark the task location.</Text>
@@ -501,6 +529,11 @@ const styles = StyleSheet.create({
     },
     locationInfoText: {
         fontSize: 14,
+        color: COLORS.textMuted,
+    },
+    locationCoordinateText: {
+        marginTop: 4,
+        fontSize: 12,
         color: COLORS.textMuted,
     },
     locationInfoPlaceholder: {
