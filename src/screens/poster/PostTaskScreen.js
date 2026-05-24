@@ -70,6 +70,13 @@ const BANGALORE_LOCATIONS = [
     { name: 'Andrahalli', lat: 12.8844, lng: 77.5989 },
 ];
 
+const BANGALORE_BOUNDS = {
+    minLat: 12.75,
+    maxLat: 13.20,
+    minLng: 77.40,
+    maxLng: 77.80,
+};
+
 const isWithinBangalore = (lat, lng) => {
     return lat >= BANGALORE_BOUNDS.minLat && lat <= BANGALORE_BOUNDS.maxLat &&
            lng >= BANGALORE_BOUNDS.minLng && lng <= BANGALORE_BOUNDS.maxLng;
@@ -392,6 +399,19 @@ export default function PostTaskScreen({ navigation }) {
               {taskLocation && <Marker coordinate={taskLocation} title="📍 Task Location" pinColor="#10B981" />}
             </MapView>
 
+            <View style={styles.locationInfoBox}>
+              {taskLocation ? (
+                <>
+                  <Text style={styles.locationInfoLabel}>Selected location</Text>
+                  <Text style={styles.locationInfoText}>
+                    {taskLocation.latitude.toFixed(5)}, {taskLocation.longitude.toFixed(5)}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.locationInfoPlaceholder}>Tap anywhere on the map to mark the task location.</Text>
+              )}
+            </View>
+
             {locationError && <View style={styles.errorBox}><Text style={styles.errorBarText}>{locationError}</Text></View>}
             {taskLocation && <View style={styles.successBox}><Text style={styles.successText}>✅ Location set! Ready to post.</Text></View>}
 
@@ -464,6 +484,29 @@ const styles = StyleSheet.create({
     mapHint: { fontSize: 13, color: COLORS.textMuted },
     errorBar: { fontSize: 12, color: '#EF4444', marginTop: 8, fontWeight: '500' },
     map: { flex: 1 },
+    locationInfoBox: {
+        marginHorizontal: 16,
+        marginTop: 12,
+        padding: 14,
+        borderRadius: 14,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+    },
+    locationInfoLabel: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    locationInfoText: {
+        fontSize: 14,
+        color: COLORS.textMuted,
+    },
+    locationInfoPlaceholder: {
+        fontSize: 14,
+        color: COLORS.textMuted,
+    },
     mapControls: {
         flexDirection: 'row', padding: 16, gap: 12,
         backgroundColor: COLORS.card, borderTopWidth: 1, borderTopColor: COLORS.border,
