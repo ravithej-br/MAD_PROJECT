@@ -6,45 +6,40 @@
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
-    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
+    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from '../../components/MapView';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as ImagePicker from 'expo-image-picker';
+import { db, storage } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import { COLORS } from '../../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserLocation } from '../../utils/location';
 import { showAlert } from '../../utils/alert';
 
-// Popular Bangalore areas with coordinates
-const BANGALORE_LOCATIONS = [
-    { name: 'Basavangudi', lat: 12.9352, lng: 77.5808 },
-    { name: 'Bommasandra', lat: 12.7391, lng: 77.5733 },
-    { name: 'Koramangala', lat: 12.9352, lng: 77.6245 },
-    { name: 'Indiranagar', lat: 12.9716, lng: 77.6412 },
-    { name: 'Whitefield', lat: 12.9698, lng: 77.7499 },
-    { name: 'Jayanagar', lat: 12.9352, lng: 77.5946 },
-    { name: 'Bannerghatta', lat: 12.8599, lng: 77.6245 },
-    { name: 'Marathahalli', lat: 12.9695, lng: 77.7076 },
-    { name: 'Sarjapur', lat: 12.7639, lng: 77.6704 },
-    { name: 'Electronic City', lat: 12.8389, lng: 77.6660 },
-    { name: 'Silk Board', lat: 12.9451, lng: 77.6245 },
-    { name: 'HSR Layout', lat: 12.9352, lng: 77.6245 },
-    { name: 'Vivek Nagar', lat: 12.9352, lng: 77.5946 },
-    { name: 'Yeshwantpur', lat: 13.0368, lng: 77.5737 },
-    { name: 'Rajajinagar', lat: 13.0012, lng: 77.5735 },
-    { name: 'Malleswaram', lat: 13.0012, lng: 77.5900 },
-    { name: 'Frazer Town', lat: 13.0012, lng: 77.6012 },
-    { name: 'Shivajinagar', lat: 13.0012, lng: 77.5946 },
-    { name: 'Vijayanagar', lat: 13.0100, lng: 77.5500 },
-    { name: 'Cantonment', lat: 12.9716, lng: 77.5946 },
-    { name: 'JP Nagar', lat: 12.8844, lng: 77.5989 },
-    { name: 'Magadi Road', lat: 12.8844, lng: 77.5500 },
-    { name: 'Banasavakya', lat: 12.8500, lng: 77.5500 },
-    { name: 'Kengeri', lat: 12.8844, lng: 77.4500 },
-    { name: 'Andrahalli', lat: 12.8844, lng: 77.5989 },
-];
+// Geocode address using Nominatim (free, no API key needed)
+const geocodeAddress = async (address) => {
+    try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address + ", Bangalore, India")}&format=json&limit=5`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+            return data.map(result => ({
+                name: result.display_name.split(',')[0], // Extract just the main name
+                lat: parseFloat(result.lat),
+                lng: parseFloat(result.lon),
+                display_name: result.display_name,
+            }));
+        }
+        return [];
+    } catch (error) {
+        console.log('Geocoding error:', error);
+        return [];
+    }
+};
 
 const isWithinBangalore = (lat, lng) => {
     return lat >= BANGALORE_BOUNDS.minLat && lat <= BANGALORE_BOUNDS.maxLat &&
@@ -80,11 +75,13 @@ export default function PostTaskScreen({ navigation }) {
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [locationError, setLocationError] = useState('');
+    const [taskImage, setTaskImage] = useState(null);
+    const [imageUploading, setImageUploading] = useState(false);
 
     // Validation Errors
     const [errors, setErrors] = useState({});
 
-    // Filter suggestions as user types
+    // Filter suggestions - both preset areas AND geocoded results
     React.useEffect(() => {
         if (!searchQuery.trim()) {
             setSuggestions([]);
@@ -92,13 +89,38 @@ export default function PostTaskScreen({ navigation }) {
             return;
         }
 
+        // First show matching preset areas
         const query = searchQuery.toLowerCase();
-        const filtered = BANGALORE_LOCATIONS.filter(loc =>
+        const presetMatches = BANGALORE_LOCATIONS.filter(loc =>
             loc.name.toLowerCase().includes(query)
         );
         
-        setSuggestions(filtered);
-        setShowSuggestions(filtered.length > 0);
+        // Then fetch geocoded results for any address
+        const fetchGeocoded = async () => {
+            const geocodedResults = await geocodeAddress(searchQuery);
+            
+            // Combine: preset areas first, then geocoded results
+            const combined = [...presetMatches];
+            
+            // Add geocoded results that aren't already in preset
+            for (const result of geocodedResults) {
+                if (!combined.find(p => p.name.toLowerCase() === result.name.toLowerCase())) {
+                    combined.push(result);
+                }
+            }
+            
+            setSuggestions(combined);
+            setShowSuggestions(combined.length > 0);
+        };
+        
+        // Show preset matches immediately
+        setSuggestions(presetMatches);
+        if (presetMatches.length > 0) {
+            setShowSuggestions(true);
+        }
+        
+        // Fetch geocoded in background
+        fetchGeocoded();
     }, [searchQuery]);
 
     // Initialize taskLocation when userLoc is fetched
@@ -170,6 +192,56 @@ export default function PostTaskScreen({ navigation }) {
         setTaskLocation(coordinate);
     };
 
+    const pickImage = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Camera roll permission needed to upload images.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.7,
+            });
+
+            if (!result.canceled) {
+                setTaskImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to pick image: ' + error.message);
+        }
+    };
+
+    const uploadImage = async (imageUri) => {
+        try {
+            setImageUploading(true);
+            
+            // Convert image to blob
+            const response = await fetch(imageUri);
+            const blob = await response.blob();
+            
+            // Create unique filename
+            const filename = `tasks/${user.uid}/${Date.now()}.jpg`;
+            const storageRef = ref(storage, filename);
+            
+            // Upload to Firebase Storage
+            await uploadBytes(storageRef, blob);
+            
+            // Get download URL
+            const downloadURL = await getDownloadURL(storageRef);
+            setImageUploading(false);
+            
+            return downloadURL;
+        } catch (error) {
+            setImageUploading(false);
+            console.error('Image upload error:', error);
+            throw error;
+        }
+    };
+
     const handlePost = async () => {
         if (!taskLocation) {
             showAlert('No Location', 'Please set a location on the map.');
@@ -177,12 +249,20 @@ export default function PostTaskScreen({ navigation }) {
         }
         setLoading(true);
         try {
+            let imageURL = null;
+            
+            // Upload image if selected
+            if (taskImage) {
+                imageURL = await uploadImage(taskImage);
+            }
+            
             await addDoc(collection(db, 'tasks'), {
                 title: title.trim(),
                 description: description.trim(),
                 price: parseFloat(price),
                 category,
                 location: taskLocation,
+                imageURL,  // Add image URL
                 status: 'open',
                 posterId: user.uid,
                 runnerId: null,
@@ -268,6 +348,24 @@ export default function PostTaskScreen({ navigation }) {
                     onChangeText={setPrice}
                 />
                 {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
+
+                <Text style={styles.label}>📸 Add Photo (Optional)</Text>
+                <TouchableOpacity style={styles.imageUploadBtn} onPress={pickImage}>
+                    <Text style={styles.imageUploadText}>
+                        {taskImage ? '✅ Photo Added - Tap to Change' : '📷 Choose Photo'}
+                    </Text>
+                </TouchableOpacity>
+                {taskImage && (
+                    <View style={styles.imagePreview}>
+                        <Image source={{ uri: taskImage }} style={styles.previewImage} />
+                        <TouchableOpacity 
+                            style={styles.removeImageBtn}
+                            onPress={() => setTaskImage(null)}
+                        >
+                            <Text style={styles.removeImageText}>✕ Remove</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
                     <Text style={styles.nextBtnText}>Next: Set Location →</Text>
@@ -436,5 +534,22 @@ const styles = StyleSheet.create({
     },
     backBtnText: { fontWeight: '600', color: COLORS.text },
     postBtn: { flex: 2, backgroundColor: COLORS.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
+    imageUploadBtn: {
+        backgroundColor: COLORS.card, borderRadius: 12, padding: 16,
+        borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed',
+        alignItems: 'center', marginBottom: 12,
+    },
+    imageUploadText: { fontSize: 15, color: COLORS.primary, fontWeight: '600' },
+    imagePreview: {
+        marginBottom: 16, alignItems: 'center',
+    },
+    previewImage: {
+        width: '100%', height: 200, borderRadius: 12, marginBottom: 8,
+        backgroundColor: COLORS.card,
+    },
+    removeImageBtn: {
+        paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FEE2E2', borderRadius: 6,
+    },
+    removeImageText: { color: '#EF4444', fontWeight: '600', fontSize: 12 },
     hidden: { display: 'none' },
 });

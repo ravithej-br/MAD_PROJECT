@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    ActivityIndicator, Platform, TextInput, KeyboardAvoidingView
+    ActivityIndicator, Platform, TextInput, KeyboardAvoidingView, Image
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from '../../components/MapView';
 import { doc, onSnapshot, updateDoc, getDoc, serverTimestamp, arrayUnion, increment } from 'firebase/firestore';
@@ -222,12 +222,27 @@ export default function TaskDetailScreen({ route, navigation }) {
 
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 20) }]}>
                 <View style={styles.mapCard}>
-                    <MapView style={styles.map} provider={PROVIDER_DEFAULT} initialRegion={{ ...task.location, latitudeDelta: 0.02, longitudeDelta: 0.02 }} scrollEnabled={false}>
-                        <Marker coordinate={task.location} title="Task Goal" pinColor={COLORS.primary} />
+                    <MapView 
+                        style={styles.map} 
+                        provider={PROVIDER_DEFAULT}
+                        region={task.location ? { 
+                            latitude: task.location.latitude || 12.9716,
+                            longitude: task.location.longitude || 77.5946,
+                            latitudeDelta: 0.02, 
+                            longitudeDelta: 0.02 
+                        } : { 
+                            latitude: 12.9716, 
+                            longitude: 77.5946, 
+                            latitudeDelta: 0.1, 
+                            longitudeDelta: 0.1 
+                        }}
+                        scrollEnabled={false}
+                    >
+                        {task.location && <Marker coordinate={{ latitude: task.location.latitude, longitude: task.location.longitude }} title="📍 Task Location" pinColor={COLORS.primary} />}
                         {task.runnerLocation && (
                             <>
-                                <Marker coordinate={task.runnerLocation} title="Runner" pinColor={COLORS.warning} />
-                                <Polyline coordinates={[task.runnerLocation, task.location]} strokeWidth={3} strokeColor={COLORS.warning} lineDashPattern={[5, 5]} />
+                                <Marker coordinate={task.runnerLocation} title="🏃 Runner" pinColor={COLORS.warning} />
+                                <Polyline coordinates={[task.runnerLocation, { latitude: task.location.latitude, longitude: task.location.longitude }]} strokeWidth={3} strokeColor={COLORS.warning} lineDashPattern={[5, 5]} />
                             </>
                         )}
                     </MapView>
@@ -235,6 +250,12 @@ export default function TaskDetailScreen({ route, navigation }) {
                         <View style={styles.etaBadge}><Text style={styles.etaText}>📍 Runner: {formattedDist} away ({calculateETA(rawDist)})</Text></View>
                     )}
                 </View>
+
+                {task.imageURL && (
+                    <View style={styles.imageCard}>
+                        <Image source={{ uri: task.imageURL }} style={styles.taskImage} />
+                    </View>
+                )}
 
                 <View style={styles.infoSection}>
                     <View style={styles.topLine}>
@@ -323,4 +344,6 @@ const styles = StyleSheet.create({
         shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84,
     },
     toastText: { color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 14 },
+    imageCard: { borderRadius: 20, overflow: 'hidden', ...SHADOWS.card, marginBottom: 20 },
+    taskImage: { width: '100%', height: 250, backgroundColor: COLORS.card },
 });
