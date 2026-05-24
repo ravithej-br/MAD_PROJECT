@@ -17,6 +17,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserLocation } from '../../utils/location';
 import { showAlert } from '../../utils/alert';
 
+// Bangalore metro area bounds (slightly expanded)
+const BANGALORE_BOUNDS = {
+    minLat: 12.7, maxLat: 13.2,
+    minLng: 77.2, maxLng: 77.95,
+};
+
+const isWithinBangalore = (lat, lng) => {
+    return lat >= BANGALORE_BOUNDS.minLat && lat <= BANGALORE_BOUNDS.maxLat &&
+           lng >= BANGALORE_BOUNDS.minLng && lng <= BANGALORE_BOUNDS.maxLng;
+};
+
 const CATEGORIES = [
     { icon: '🛋️', label: 'Assembly' },
     { icon: '🐕', label: 'Dog Walk' },
@@ -42,6 +53,8 @@ export default function PostTaskScreen({ navigation }) {
     const [taskLocation, setTaskLocation] = useState(null);
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(1);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [locationError, setLocationError] = useState('');
 
     // Validation Errors
     const [errors, setErrors] = useState({});
@@ -84,8 +97,14 @@ export default function PostTaskScreen({ navigation }) {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleNext = () => {
-        if (validateStep1()) setStep(2);
+    const handleLocationTap = (coordinate) => {
+        const { latitude, longitude } = coordinate;
+        if (!isWithinBangalore(latitude, longitude)) {
+            setLocationError('Location must be within Bangalore metro area');
+            return;
+        }
+        setLocationError('');
+        setTaskLocation(coordinate);
     };
 
     const handlePost = async () => {
