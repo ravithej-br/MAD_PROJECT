@@ -97,6 +97,12 @@ export default function PostTaskScreen({ navigation }) {
         return Object.keys(newErrors).length === 0;
     };
 
+    const handleNext = () => {
+        if (validateStep1()) {
+            setStep(2);
+        }
+    };
+
     const handleLocationTap = (coordinate) => {
         const { latitude, longitude } = coordinate;
         if (!isWithinBangalore(latitude, longitude)) {
@@ -215,14 +221,26 @@ export default function PostTaskScreen({ navigation }) {
         {step === 2 && (
           <View style={styles.flex}>
             <View style={styles.mapHintBar}>
+              <Text style={styles.label}>📍 Search Location (Optional)</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="e.g. Koramangala, Bangalore"
+                placeholderTextColor={COLORS.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            <View style={styles.instructionBar}>
               {locationLoading ? (
                 <View style={styles.locatingRow}>
                   <ActivityIndicator size="small" color={COLORS.primary} />
                   <Text style={styles.mapHint}>  Getting your location…</Text>
                 </View>
               ) : (
-                <Text style={styles.mapHint}>📍 Tap anywhere on the map to set task location</Text>
+                <Text style={styles.mapHint}>👆 Tap anywhere on map to set task location</Text>
               )}
+              {locationError && <Text style={styles.errorBar}>{locationError}</Text>}
             </View>
 
             <MapView
@@ -233,11 +251,12 @@ export default function PostTaskScreen({ navigation }) {
                   ? { ...taskLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 }
                   : { ...DEFAULT_LOCATION, latitudeDelta: 0.05, longitudeDelta: 0.05 }
               }
-              onPress={(e) => setTaskLocation(e.nativeEvent.coordinate)}
+              onPress={(e) => handleLocationTap(e.nativeEvent.coordinate)}
               showsUserLocation={true}
               visible={step === 2}
+              searchQuery={searchQuery}
             >
-              {taskLocation && <Marker coordinate={taskLocation} title="Task Location" />}
+              {taskLocation && <Marker coordinate={taskLocation} title="📍 Task Location" />}
             </MapView>
 
             <View style={[styles.mapControls, { paddingBottom: Math.max(insets.bottom, 16) }] }>
@@ -298,8 +317,18 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card, paddingHorizontal: 16, paddingVertical: 12,
         borderBottomWidth: 1, borderBottomColor: COLORS.border,
     },
+    searchInput: {
+        backgroundColor: COLORS.background, borderRadius: 10, padding: 12,
+        fontSize: 14, color: COLORS.text, marginTop: 8,
+        borderWidth: 1, borderColor: COLORS.border,
+    },
+    instructionBar: {
+        backgroundColor: COLORS.card, paddingHorizontal: 16, paddingVertical: 12,
+        borderBottomWidth: 1, borderBottomColor: COLORS.border,
+    },
     locatingRow: { flexDirection: 'row', alignItems: 'center' },
     mapHint: { fontSize: 13, color: COLORS.textMuted },
+    errorBar: { fontSize: 12, color: '#EF4444', marginTop: 8, fontWeight: '500' },
     map: { flex: 1 },
     mapControls: {
         flexDirection: 'row', padding: 16, gap: 12,
