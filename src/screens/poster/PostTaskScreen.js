@@ -222,8 +222,25 @@ export default function PostTaskScreen({ navigation }) {
             
             // Upload image if selected
             if (taskImage) {
-                imageURL = await uploadImage(taskImage);
+                try {
+                    imageURL = await uploadImage(taskImage);
+                } catch (imgErr) {
+                    console.error('Image upload failed:', imgErr);
+                    // Continue even if image upload fails
+                    showAlert('Warning', 'Image upload failed, but task will be posted without image.');
+                }
             }
+            
+            console.log('Posting task with data:', {
+                title: title.trim(),
+                description: description.trim(),
+                price: parseFloat(price),
+                category,
+                location: taskLocation,
+                imageURL,
+                status: 'open',
+                posterId: user.uid,
+            });
             
             await addDoc(collection(db, 'tasks'), {
                 title: title.trim(),
@@ -231,19 +248,30 @@ export default function PostTaskScreen({ navigation }) {
                 price: parseFloat(price),
                 category,
                 location: taskLocation,
-                imageURL,  // Add image URL
+                imageURL,
                 status: 'open',
                 posterId: user.uid,
                 runnerId: null,
                 createdAt: serverTimestamp(),
             });
+            
+            setLoading(false);
             showAlert('🎉 Task Posted!', 'Your task is live. Runners near you will see it.', [
-                { text: 'OK', onPress: () => navigation.goBack() },
+                { text: 'OK', onPress: () => {
+                    setTitle('');
+                    setDescription('');
+                    setPrice('');
+                    setCategory(null);
+                    setTaskLocation(null);
+                    setTaskImage(null);
+                    setStep(1);
+                    navigation.goBack();
+                }},
             ]);
         } catch (err) {
-            showAlert('Error', err.message);
-        } finally {
+            console.error('Post error:', err);
             setLoading(false);
+            showAlert('Error Posting Task', err.message || 'Failed to post task. Check internet connection.');
         }
     };
 
@@ -349,18 +377,6 @@ export default function PostTaskScreen({ navigation }) {
               <Text style={styles.instructionText}>👆 Tap anywhere on map to mark location</Text>
             </View>
 
-            <View style={styles.instructionBar}>
-              {locationLoading ? (
-                <View style={styles.locatingRow}>
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                  <Text style={styles.mapHint}>  Getting your location…</Text>
-                </View>
-              ) : (
-                <Text style={styles.mapHint}>👆 Tap anywhere on map to set task location</Text>
-              )}
-              {locationError && <Text style={styles.errorBar}>{locationError}</Text>}
-            </View>
-
             <MapView
               style={styles.map}
               provider={PROVIDER_DEFAULT}
@@ -375,6 +391,9 @@ export default function PostTaskScreen({ navigation }) {
             >
               {taskLocation && <Marker coordinate={taskLocation} title="📍 Task Location" pinColor="#10B981" />}
             </MapView>
+
+            {locationError && <View style={styles.errorBox}><Text style={styles.errorBarText}>{locationError}</Text></View>}
+            {taskLocation && <View style={styles.successBox}><Text style={styles.successText}>✅ Location set! Ready to post.</Text></View>}
 
             <View style={[styles.mapControls, { paddingBottom: Math.max(insets.bottom, 16) }] }>
               <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
@@ -472,5 +491,33 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FEE2E2', borderRadius: 6,
     },
     removeImageText: { color: '#EF4444', fontWeight: '600', fontSize: 12 },
+    errorBox: { 
+        backgroundColor: '#FEE2E2', 
+        padding: 12, 
+        borderRadius: 8, 
+        marginHorizontal: 16, 
+        marginTop: 8,
+        borderLeftWidth: 4,
+        borderLeftColor: '#EF4444',
+    },
+    errorBarText: { 
+        color: '#EF4444', 
+        fontWeight: '600', 
+        fontSize: 13 
+    },
+    successBox: { 
+        backgroundColor: '#DCFCE7', 
+        padding: 12, 
+        borderRadius: 8, 
+        marginHorizontal: 16, 
+        marginTop: 8,
+        borderLeftWidth: 4,
+        borderLeftColor: '#10B981',
+    },
+    successText: { 
+        color: '#10B981', 
+        fontWeight: '600', 
+        fontSize: 13 
+    },
     hidden: { display: 'none' },
 });
