@@ -17,11 +17,34 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserLocation } from '../../utils/location';
 import { showAlert } from '../../utils/alert';
 
-// Bangalore metro area bounds (slightly expanded)
-const BANGALORE_BOUNDS = {
-    minLat: 12.7, maxLat: 13.2,
-    minLng: 77.2, maxLng: 77.95,
-};
+// Popular Bangalore areas with coordinates
+const BANGALORE_LOCATIONS = [
+    { name: 'Basavangudi', lat: 12.9352, lng: 77.5808 },
+    { name: 'Bommasandra', lat: 12.7391, lng: 77.5733 },
+    { name: 'Koramangala', lat: 12.9352, lng: 77.6245 },
+    { name: 'Indiranagar', lat: 12.9716, lng: 77.6412 },
+    { name: 'Whitefield', lat: 12.9698, lng: 77.7499 },
+    { name: 'Jayanagar', lat: 12.9352, lng: 77.5946 },
+    { name: 'Bannerghatta', lat: 12.8599, lng: 77.6245 },
+    { name: 'Marathahalli', lat: 12.9695, lng: 77.7076 },
+    { name: 'Sarjapur', lat: 12.7639, lng: 77.6704 },
+    { name: 'Electronic City', lat: 12.8389, lng: 77.6660 },
+    { name: 'Silk Board', lat: 12.9451, lng: 77.6245 },
+    { name: 'HSR Layout', lat: 12.9352, lng: 77.6245 },
+    { name: 'Vivek Nagar', lat: 12.9352, lng: 77.5946 },
+    { name: 'Yeshwantpur', lat: 13.0368, lng: 77.5737 },
+    { name: 'Rajajinagar', lat: 13.0012, lng: 77.5735 },
+    { name: 'Malleswaram', lat: 13.0012, lng: 77.5900 },
+    { name: 'Frazer Town', lat: 13.0012, lng: 77.6012 },
+    { name: 'Shivajinagar', lat: 13.0012, lng: 77.5946 },
+    { name: 'Vijayanagar', lat: 13.0100, lng: 77.5500 },
+    { name: 'Cantonment', lat: 12.9716, lng: 77.5946 },
+    { name: 'JP Nagar', lat: 12.8844, lng: 77.5989 },
+    { name: 'Magadi Road', lat: 12.8844, lng: 77.5500 },
+    { name: 'Banasavakya', lat: 12.8500, lng: 77.5500 },
+    { name: 'Kengeri', lat: 12.8844, lng: 77.4500 },
+    { name: 'Andrahalli', lat: 12.8844, lng: 77.5989 },
+];
 
 const isWithinBangalore = (lat, lng) => {
     return lat >= BANGALORE_BOUNDS.minLat && lat <= BANGALORE_BOUNDS.maxLat &&
@@ -54,25 +77,49 @@ export default function PostTaskScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
-    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const [locationError, setLocationError] = useState('');
 
     // Validation Errors
     const [errors, setErrors] = useState({});
 
-    // Debounce search - only update map after user stops typing for 1 second
+    // Filter suggestions as user types
     React.useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearchQuery(searchQuery);
-        }, 1000);
+        if (!searchQuery.trim()) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
 
-        return () => clearTimeout(timer);
+        const query = searchQuery.toLowerCase();
+        const filtered = BANGALORE_LOCATIONS.filter(loc =>
+            loc.name.toLowerCase().includes(query)
+        );
+        
+        setSuggestions(filtered);
+        setShowSuggestions(filtered.length > 0);
     }, [searchQuery]);
 
     // Initialize taskLocation when userLoc is fetched
     React.useEffect(() => {
         if (userLoc && !taskLocation) setTaskLocation(userLoc);
     }, [userLoc]);
+
+    const handleSuggestionSelect = (location) => {
+        // Set the location from suggestion
+        setTaskLocation({
+            latitude: location.lat,
+            longitude: location.lng,
+        });
+        // Update search box with location name
+        setSearchQuery(location.name);
+        // Clear suggestions
+        setShowSuggestions(false);
+        setSuggestions([]);
+        // Clear any error
+        setLocationError('');
+    };
 
     const validateStep1 = () => {
         let newErrors = {};
@@ -231,17 +278,30 @@ export default function PostTaskScreen({ navigation }) {
         {step === 2 && (
           <View style={styles.flex}>
             <View style={styles.mapHintBar}>
-              <Text style={styles.label}>📍 Search Location (Optional)</Text>
+              <Text style={styles.label}>📍 Search Location</Text>
               <View style={styles.searchContainer}>
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="e.g. Koramangala, Bangalore"
+                  placeholder="Type area name (e.g. Koramangala, Basavangudi)"
                   placeholderTextColor={COLORS.textMuted}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
+                  onFocus={() => searchQuery && setShowSuggestions(true)}
                 />
-                {searchQuery && searchQuery !== debouncedSearchQuery && (
-                  <Text style={styles.searchingText}>Searching...</Text>
+                
+                {/* Suggestions Dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <View style={styles.suggestionsDropdown}>
+                    {suggestions.map((location, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.suggestionItem}
+                        onPress={() => handleSuggestionSelect(location)}
+                      >
+                        <Text style={styles.suggestionText}>📍 {location.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 )}
               </View>
             </View>
@@ -269,7 +329,6 @@ export default function PostTaskScreen({ navigation }) {
               onPress={(e) => handleLocationTap(e.nativeEvent.coordinate)}
               showsUserLocation={true}
               visible={step === 2}
-              searchQuery={debouncedSearchQuery}
             >
               {taskLocation && <Marker coordinate={taskLocation} title="📍 Task Location" />}
             </MapView>
@@ -340,8 +399,24 @@ const styles = StyleSheet.create({
         fontSize: 14, color: COLORS.text,
         borderWidth: 1, borderColor: COLORS.border,
     },
-    searchingText: {
-        fontSize: 11, color: COLORS.primary, marginTop: 6, fontWeight: '500',
+    suggestionsDropdown: {
+        backgroundColor: COLORS.card,
+        borderRadius: 10,
+        marginTop: 4,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        maxHeight: 250,
+    },
+    suggestionItem: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    suggestionText: {
+        fontSize: 14,
+        color: COLORS.text,
+        fontWeight: '500',
     },
     instructionBar: {
         backgroundColor: COLORS.card, paddingHorizontal: 16, paddingVertical: 12,
