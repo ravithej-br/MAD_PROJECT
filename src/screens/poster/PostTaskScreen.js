@@ -100,9 +100,6 @@ export default function PostTaskScreen({ navigation }) {
     const [taskLocation, setTaskLocation] = useState(null);
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(1);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [suggestions, setSuggestions] = useState([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
     const [locationError, setLocationError] = useState('');
     const [taskImage, setTaskImage] = useState(null);
     const [imageUploading, setImageUploading] = useState(false);
@@ -110,67 +107,10 @@ export default function PostTaskScreen({ navigation }) {
     // Validation Errors
     const [errors, setErrors] = useState({});
 
-    // Filter suggestions - both preset areas AND geocoded results
-    React.useEffect(() => {
-        if (!searchQuery.trim()) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-
-        // First show matching preset areas
-        const query = searchQuery.toLowerCase();
-        const presetMatches = BANGALORE_LOCATIONS.filter(loc =>
-            loc.name.toLowerCase().includes(query)
-        );
-        
-        // Then fetch geocoded results for any address
-        const fetchGeocoded = async () => {
-            const geocodedResults = await geocodeAddress(searchQuery);
-            
-            // Combine: preset areas first, then geocoded results
-            const combined = [...presetMatches];
-            
-            // Add geocoded results that aren't already in preset
-            for (const result of geocodedResults) {
-                if (!combined.find(p => p.name.toLowerCase() === result.name.toLowerCase())) {
-                    combined.push(result);
-                }
-            }
-            
-            setSuggestions(combined);
-            setShowSuggestions(combined.length > 0);
-        };
-        
-        // Show preset matches immediately
-        setSuggestions(presetMatches);
-        if (presetMatches.length > 0) {
-            setShowSuggestions(true);
-        }
-        
-        // Fetch geocoded in background
-        fetchGeocoded();
-    }, [searchQuery]);
-
     // Initialize taskLocation when userLoc is fetched
     React.useEffect(() => {
         if (userLoc && !taskLocation) setTaskLocation(userLoc);
     }, [userLoc]);
-
-    const handleSuggestionSelect = (location) => {
-        // Set the location from suggestion
-        setTaskLocation({
-            latitude: location.lat,
-            longitude: location.lng,
-        });
-        // Update search box with location name
-        setSearchQuery(location.name);
-        // Clear suggestions
-        setShowSuggestions(false);
-        setSuggestions([]);
-        // Clear any error
-        setLocationError('');
-    };
 
     const validateStep1 = () => {
         let newErrors = {};
@@ -405,32 +345,8 @@ export default function PostTaskScreen({ navigation }) {
         {step === 2 && (
           <View style={styles.flex}>
             <View style={styles.mapHintBar}>
-              <Text style={styles.label}>📍 Search Location</Text>
-              <View style={styles.searchContainer}>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Type area name (e.g. Koramangala, Basavangudi)"
-                  placeholderTextColor={COLORS.textMuted}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  onFocus={() => searchQuery && setShowSuggestions(true)}
-                />
-                
-                {/* Suggestions Dropdown */}
-                {showSuggestions && suggestions.length > 0 && (
-                  <View style={styles.suggestionsDropdown}>
-                    {suggestions.map((location, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.suggestionItem}
-                        onPress={() => handleSuggestionSelect(location)}
-                      >
-                        <Text style={styles.suggestionText}>📍 {location.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
+              <Text style={styles.label}>📍 Set Task Location</Text>
+              <Text style={styles.instructionText}>👆 Tap anywhere on map to mark location</Text>
             </View>
 
             <View style={styles.instructionBar}>
@@ -518,32 +434,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card, paddingHorizontal: 16, paddingVertical: 12,
         borderBottomWidth: 1, borderBottomColor: COLORS.border,
     },
-    searchContainer: {
-        marginTop: 8,
-    },
-    searchInput: {
-        backgroundColor: COLORS.background, borderRadius: 10, padding: 12,
-        fontSize: 14, color: COLORS.text,
-        borderWidth: 1, borderColor: COLORS.border,
-    },
-    suggestionsDropdown: {
-        backgroundColor: COLORS.card,
-        borderRadius: 10,
-        marginTop: 4,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        maxHeight: 250,
-    },
-    suggestionItem: {
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-    },
-    suggestionText: {
-        fontSize: 14,
-        color: COLORS.text,
-        fontWeight: '500',
+    instructionText: {
+        fontSize: 13, color: COLORS.textMuted, marginTop: 8, fontStyle: 'italic',
     },
     instructionBar: {
         backgroundColor: COLORS.card, paddingHorizontal: 16, paddingVertical: 12,
