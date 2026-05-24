@@ -6,13 +6,11 @@
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
-    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert,
+    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from '../../components/MapView';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import * as ImagePicker from 'expo-image-picker';
-import { db, storage } from '../../config/firebase';
+import { db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import { COLORS } from '../../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,12 +39,28 @@ const geocodeAddress = async (address) => {
     }
 };
 
+const promiseTimeout = async (promise, ms, timeoutMessage) => {
+    let timeoutHandle;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error(timeoutMessage)), ms);
+    });
+    try {
+        return await Promise.race([promise, timeoutPromise]);
+    } finally {
+        clearTimeout(timeoutHandle);
+    }
+};
+
 const reverseGeocodeLocation = async (latitude, longitude) => {
     try {
         const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`;
-        const response = await fetch(url, {
-            headers: { 'Accept-Language': 'en', 'User-Agent': 'TaskHub/1.0' },
-        });
+        const response = await promiseTimeout(
+            fetch(url, {
+                headers: { 'Accept-Language': 'en', 'User-Agent': 'TaskHub/1.0' },
+            }),
+            8000,
+            'Reverse geocoding request timed out'
+        );
         const data = await response.json();
         if (!data || !data.address) return null;
 
@@ -126,8 +140,6 @@ export default function PostTaskScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(1);
     const [locationError, setLocationError] = useState('');
-    const [taskImage, setTaskImage] = useState(null);
-    const [imageUploading, setImageUploading] = useState(false);
 
     // Validation Errors
     const [errors, setErrors] = useState({});
@@ -194,55 +206,6 @@ export default function PostTaskScreen({ navigation }) {
         }
     };
 
-    const pickImage = async () => {
-        try {
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Required', 'Camera roll permission needed to upload images.');
-                return;
-            }
-
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.7,
-            });
-
-            if (!result.canceled) {
-                setTaskImage(result.assets[0].uri);
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Failed to pick image: ' + error.message);
-        }
-    };
-
-    const uploadImage = async (imageUri) => {
-        try {
-            setImageUploading(true);
-            
-            // Convert image to blob
-            const response = await fetch(imageUri);
-            const blob = await response.blob();
-            
-            // Create unique filename
-            const filename = `tasks/${user.uid}/${Date.now()}.jpg`;
-            const storageRef = ref(storage, filename);
-            
-            // Upload to Firebase Storage
-            await uploadBytes(storageRef, blob);
-            
-            // Get download URL
-            const downloadURL = await getDownloadURL(storageRef);
-            setImageUploading(false);
-            
-            return downloadURL;
-        } catch (error) {
-            setImageUploading(false);
-            console.error('Image upload error:', error);
-            throw error;
-        }
-    };
 
     const handlePost = async () => {
         if (!taskLocation) {
@@ -258,15 +221,6 @@ export default function PostTaskScreen({ navigation }) {
         try {
             let imageURL = null;
             
-            if (taskImage) {
-                try {
-                    imageURL = await uploadImage(taskImage);
-                } catch (imgErr) {
-                    console.error('Image upload failed:', imgErr);
-                    showAlert('Warning', 'Image upload failed, but task will be posted without image.');
-                }
-            }
-
             const taskPayload = {
                 title: title.trim(),
                 description: description.trim(),
@@ -274,7 +228,6 @@ export default function PostTaskScreen({ navigation }) {
                 category,
                 location: taskLocation,
                 locationName: locationName || 'Bangalore location',
-                imageURL,
                 status: 'open',
                 posterId: user.uid,
                 runnerId: null,
@@ -282,7 +235,11 @@ export default function PostTaskScreen({ navigation }) {
             };
 
             console.log('Posting task with data:', taskPayload);
-            await addDoc(collection(db, 'tasks'), taskPayload);
+            await promiseTimeout(
+                addDoc(collection(db, 'tasks'), taskPayload),
+                15000,
+                'Task posting timed out. Please check your network connection and try again.'
+            );
 
             showAlert('🎉 Task Posted!', 'Your task is live. Runners near you will see it.', [
                 { text: 'OK', onPress: () => {
@@ -375,24 +332,6 @@ export default function PostTaskScreen({ navigation }) {
                     onChangeText={setPrice}
                 />
                 {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
-
-                <Text style={styles.label}>📸 Add Photo (Optional)</Text>
-                <TouchableOpacity style={styles.imageUploadBtn} onPress={pickImage}>
-                    <Text style={styles.imageUploadText}>
-                        {taskImage ? '✅ Photo Added - Tap to Change' : '📷 Choose Photo'}
-                    </Text>
-                </TouchableOpacity>
-                {taskImage && (
-                    <View style={styles.imagePreview}>
-                        <Image source={{ uri: taskImage }} style={styles.previewImage} />
-                        <TouchableOpacity 
-                            style={styles.removeImageBtn}
-                            onPress={() => setTaskImage(null)}
-                        >
-                            <Text style={styles.removeImageText}>✕ Remove</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
 
                 <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
                     <Text style={styles.nextBtnText}>Next: Set Location →</Text>
