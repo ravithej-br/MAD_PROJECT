@@ -494,27 +494,7 @@ const styles = StyleSheet.create({
         borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed',
         alignItems: 'center', marginBottom: 12,
     },
-    imageUploadText: { fontSize: 15, color: COLORS.primary, fontWeight: '600' },
-    imagePreview: {
-        marginBottom: 16, alignItems: 'center',
-    },
-    previewImage: {
-        width: '100%', height: 200, borderRadius: 12, marginBottom: 8,
-        backgroundColor: COLORS.card,
-    },
-    removeImageBtn: {
-        paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FEE2E2', borderRadius: 6,
-    },
-    removeImageText: { color: '#EF4444', fontWeight: '600', fontSize: 12 },
-    errorBox: { 
-        backgroundColor: '#FEE2E2', 
-        padding: 12, 
-        borderRadius: 8, 
-        marginHorizontal: 16, 
-        marginTop: 8,
-        borderLeftWidth: 4,
-        borderLeftColor: '#EF4444',
-    },
+   
     errorBarText: { 
         color: '#EF4444', 
         fontWeight: '600', 
