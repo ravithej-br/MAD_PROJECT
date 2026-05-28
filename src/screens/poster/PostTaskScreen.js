@@ -1,3 +1,5 @@
+
+
 // src/screens/poster/PostTaskScreen.js
 /**
  * Screen to post a new task.
@@ -6,11 +8,13 @@
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
-    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
+    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from '../../components/MapView';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as ImagePicker from 'expo-image-picker';
+import { db, storage } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import { COLORS } from '../../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,39 +40,6 @@ const geocodeAddress = async (address) => {
     } catch (error) {
         console.log('Geocoding error:', error);
         return [];
-    }
-};
-
-const promiseTimeout = async (promise, ms, timeoutMessage) => {
-    let timeoutHandle;
-    const timeoutPromise = new Promise((_, reject) => {
-        timeoutHandle = setTimeout(() => reject(new Error(timeoutMessage)), ms);
-    });
-    try {
-        return await Promise.race([promise, timeoutPromise]);
-    } finally {
-        clearTimeout(timeoutHandle);
-    }
-};
-
-const reverseGeocodeLocation = async (latitude, longitude) => {
-    try {
-        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`;
-        const response = await promiseTimeout(
-            fetch(url, {
-                headers: { 'Accept-Language': 'en', 'User-Agent': 'TaskHub/1.0' },
-            }),
-            8000,
-            'Reverse geocoding request timed out'
-        );
-        const data = await response.json();
-        if (!data || !data.address) return null;
-
-        const address = data.address;
-        return address.neighbourhood || address.suburb || address.city_district || address.city || address.town || address.village || data.display_name || null;
-    } catch (error) {
-        console.log('Reverse geocoding error:', error);
-        return null;
     }
 };
 
@@ -101,13 +72,6 @@ const BANGALORE_LOCATIONS = [
     { name: 'Andrahalli', lat: 12.8844, lng: 77.5989 },
 ];
 
-const BANGALORE_BOUNDS = {
-    minLat: 12.75,
-    maxLat: 13.20,
-    minLng: 77.40,
-    maxLng: 77.80,
-};
-
 const isWithinBangalore = (lat, lng) => {
     return lat >= BANGALORE_BOUNDS.minLat && lat <= BANGALORE_BOUNDS.maxLat &&
            lng >= BANGALORE_BOUNDS.minLng && lng <= BANGALORE_BOUNDS.maxLng;
@@ -136,10 +100,11 @@ export default function PostTaskScreen({ navigation }) {
     const [price, setPrice] = useState('');
     const [category, setCategory] = useState(null);
     const [taskLocation, setTaskLocation] = useState(null);
-    const [locationName, setLocationName] = useState('');
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(1);
     const [locationError, setLocationError] = useState('');
+    const [taskImage, setTaskImage] = useState(null);
+    const [imageUploading, setImageUploading] = useState(false);
 
     // Validation Errors
     const [errors, setErrors] = useState({});
@@ -188,7 +153,7 @@ export default function PostTaskScreen({ navigation }) {
         }
     };
 
-    const handleLocationTap = async (coordinate) => {
+    const handleLocationTap = (coordinate) => {
         const { latitude, longitude } = coordinate;
         if (!isWithinBangalore(latitude, longitude)) {
             setLocationError('Location must be within Bangalore metro area');
@@ -196,69 +161,112 @@ export default function PostTaskScreen({ navigation }) {
         }
         setLocationError('');
         setTaskLocation(coordinate);
-        setLocationName('Fetching address...');
+    };
 
-        const address = await reverseGeocodeLocation(latitude, longitude);
-        if (address) {
-            setLocationName(address);
-        } else {
-            setLocationName('Bangalore location');
+    const pickImage = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Camera roll permission needed to upload images.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.7,
+            });
+
+            if (!result.canceled) {
+                setTaskImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to pick image: ' + error.message);
         }
     };
 
+    const uploadImage = async (imageUri) => {
+        try {
+            setImageUploading(true);
+            
+            // Convert image to blob
+            const response = await fetch(imageUri);
+            const blob = await response.blob();
+            
+            // Create unique filename
+            const filename = `tasks/${user.uid}/${Date.now()}.jpg`;
+            const storageRef = ref(storage, filename);
+            
+            // Upload to Firebase Storage
+            await uploadBytes(storageRef, blob);
+            
+            // Get download URL
+            const downloadURL = await getDownloadURL(storageRef);
+            setImageUploading(false);
+            
+            return downloadURL;
+        } catch (error) {
+            setImageUploading(false);
+            console.error('Image upload error:', error);
+            throw error;
+        }
+    };
 
     const handlePost = async () => {
         if (!taskLocation) {
             showAlert('No Location', 'Please set a location on the map.');
             return;
         }
-        if (!user?.uid) {
-            showAlert('Sign in required', 'Please log in before posting tasks.');
-            return;
-        }
-
         setLoading(true);
         try {
             let imageURL = null;
             
-            const taskPayload = {
+            // Upload image if selected
+            if (taskImage) {
+                try {
+                    imageURL = await uploadImage(taskImage);
+                } catch (imgErr) {
+                    console.error('Image upload failed:', imgErr);
+                    // Continue even if image upload fails
+                    showAlert('Warning', 'Image upload failed, but task will be posted without image.');
+                }
+            }
+            
+            console.log('Posting task with data:', {
                 title: title.trim(),
                 description: description.trim(),
                 price: parseFloat(price),
                 category,
                 location: taskLocation,
-                locationName: locationName || 'Bangalore location',
+                imageURL,
+                status: 'open',
+                posterId: user.uid,
+            });
+            
+            await addDoc(collection(db, 'tasks'), {
+                title: title.trim(),
+                description: description.trim(),
+                price: parseFloat(price),
+                category,
+                location: taskLocation,
+                imageURL,
                 status: 'open',
                 posterId: user.uid,
                 runnerId: null,
                 createdAt: serverTimestamp(),
-            };
-
-            console.log('Posting task with data:', taskPayload);
-            await promiseTimeout(
-                addDoc(collection(db, 'tasks'), taskPayload),
-                15000,
-                'Task posting timed out. Please check your network connection and try again.'
-            );
-
+            });
+            
+            setLoading(false);
             showAlert('🎉 Task Posted!', 'Your task is live. Runners near you will see it.', [
                 { text: 'OK', onPress: () => {
-                    setTitle('');
-                    setDescription('');
-                    setPrice('');
-                    setCategory(null);
-                    setTaskLocation(null);
-                    setLocationName('');
-                    setTaskImage(null);
-                    setStep(1);
                     navigation.goBack();
                 }},
             ]);
         } catch (err) {
             console.error('Post error:', err);
-            showAlert('Error Posting Task', err.message || 'Failed to post task. Check internet connection.');
-        } finally {
             setLoading(false);
+            showAlert('Error Posting Task', err.message || 'Failed to post task. Check internet connection.');
         }
     };
 
@@ -333,6 +341,24 @@ export default function PostTaskScreen({ navigation }) {
                 />
                 {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
 
+                <Text style={styles.label}>📸 Add Photo (Optional)</Text>
+                <TouchableOpacity style={styles.imageUploadBtn} onPress={pickImage}>
+                    <Text style={styles.imageUploadText}>
+                        {taskImage ? '✅ Photo Added - Tap to Change' : '📷 Choose Photo'}
+                    </Text>
+                </TouchableOpacity>
+                {taskImage && (
+                    <View style={styles.imagePreview}>
+                        <Image source={{ uri: taskImage }} style={styles.previewImage} />
+                        <TouchableOpacity 
+                            style={styles.removeImageBtn}
+                            onPress={() => setTaskImage(null)}
+                        >
+                            <Text style={styles.removeImageText}>✕ Remove</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
                     <Text style={styles.nextBtnText}>Next: Set Location →</Text>
                 </TouchableOpacity>
@@ -360,24 +386,6 @@ export default function PostTaskScreen({ navigation }) {
             >
               {taskLocation && <Marker coordinate={taskLocation} title="📍 Task Location" pinColor="#10B981" />}
             </MapView>
-
-            <View style={styles.locationInfoBox}>
-              {taskLocation ? (
-                <>
-                  <Text style={styles.locationInfoLabel}>Selected location</Text>
-                  <Text style={styles.locationInfoText}>
-                    {locationName || `${taskLocation.latitude.toFixed(5)}, ${taskLocation.longitude.toFixed(5)}`}
-                  </Text>
-                  {locationName ? (
-                    <Text style={styles.locationCoordinateText}>
-                      {taskLocation.latitude.toFixed(5)}, {taskLocation.longitude.toFixed(5)}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.locationInfoPlaceholder}>Tap anywhere on the map to mark the task location.</Text>
-              )}
-            </View>
 
             {locationError && <View style={styles.errorBox}><Text style={styles.errorBarText}>{locationError}</Text></View>}
             {taskLocation && <View style={styles.successBox}><Text style={styles.successText}>✅ Location set! Ready to post.</Text></View>}
@@ -451,34 +459,6 @@ const styles = StyleSheet.create({
     mapHint: { fontSize: 13, color: COLORS.textMuted },
     errorBar: { fontSize: 12, color: '#EF4444', marginTop: 8, fontWeight: '500' },
     map: { flex: 1 },
-    locationInfoBox: {
-        marginHorizontal: 16,
-        marginTop: 12,
-        padding: 14,
-        borderRadius: 14,
-        backgroundColor: '#F8FAFC',
-        borderWidth: 1,
-        borderColor: '#CBD5E1',
-    },
-    locationInfoLabel: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: COLORS.text,
-        marginBottom: 4,
-    },
-    locationInfoText: {
-        fontSize: 14,
-        color: COLORS.textMuted,
-    },
-    locationCoordinateText: {
-        marginTop: 4,
-        fontSize: 12,
-        color: COLORS.textMuted,
-    },
-    locationInfoPlaceholder: {
-        fontSize: 14,
-        color: COLORS.textMuted,
-    },
     mapControls: {
         flexDirection: 'row', padding: 16, gap: 12,
         backgroundColor: COLORS.card, borderTopWidth: 1, borderTopColor: COLORS.border,
