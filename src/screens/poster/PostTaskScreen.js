@@ -88,6 +88,13 @@ const CATEGORIES = [
 
 const DEFAULT_LOCATION = { latitude: 12.9716, longitude: 77.5946 };
 
+// Approximate bbox for Bangalore metro - used to validate tapped locations
+const BANGALORE_BOUNDS = {
+    minLat: 12.7,
+    maxLat: 13.2,
+    minLng: 77.4,
+    maxLng: 77.9,
+};
 export default function PostTaskScreen({ navigation }) {
     const { user } = useAuthStore();
     const { location: userLoc, locationLoading } = useUserLocation();
@@ -176,8 +183,13 @@ export default function PostTaskScreen({ navigation }) {
                 quality: 0.7,
             });
 
-            if (!result.canceled) {
-                setTaskImage(result.assets[0].uri);
+            // Expo ImagePicker result shapes differ between SDKs and platforms.
+            // Guard against both `canceled` and `cancelled` flags and missing `assets`.
+            if (result && (result.canceled === false || result.cancelled === false)) {
+                const uri = result.assets && result.assets[0] ? result.assets[0].uri : result.uri;
+                if (typeof setTaskImage === 'function') {
+                    setTaskImage(uri);
+                }
             }
         } catch (error) {
             Alert.alert('Error', 'Failed to pick image: ' + error.message);
@@ -350,7 +362,7 @@ export default function PostTaskScreen({ navigation }) {
                         <Image source={{ uri: taskImage }} style={styles.previewImage} />
                         <TouchableOpacity 
                             style={styles.removeImageBtn}
-                            onPress={() => setTaskImage(null)}
+                            onPress={() => { if (typeof setTaskImage === 'function') setTaskImage(null); }}
                         >
                             <Text style={styles.removeImageText}>✕ Remove</Text>
                         </TouchableOpacity>
