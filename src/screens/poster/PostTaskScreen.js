@@ -305,6 +305,14 @@ export default function PostTaskScreen({ navigation }) {
               {taskLocation && <Marker coordinate={taskLocation} title="📍 Task Location" pinColor="#10B981" />}
             </MapView>
 
+            {taskLocation && (
+              <View style={styles.selectedLocationCard}>
+                <Text style={styles.selectedLabel}>Selected location</Text>
+                <Text style={styles.selectedLocationText}>Task location set</Text>
+                <Text style={styles.selectedCoords}>{taskLocation.latitude.toFixed(5)}, {taskLocation.longitude.toFixed(5)}</Text>
+              </View>
+            )}
+
             {locationError && <View style={styles.errorBox}><Text style={styles.errorBarText}>{locationError}</Text></View>}
             {taskLocation && <View style={styles.successBox}><Text style={styles.successText}>✅ Location set! Ready to post.</Text></View>}
 
@@ -401,6 +409,33 @@ const styles = StyleSheet.create({
         marginTop: 8,
         borderLeftWidth: 4,
         borderLeftColor: '#10B981',
+    },
+    selectedLocationCard: {
+        backgroundColor: COLORS.card,
+        borderRadius: 16,
+        padding: 16,
+        marginHorizontal: 16,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    selectedLabel: {
+        color: COLORS.textMuted,
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    selectedLocationText: {
+        color: COLORS.text,
+        fontSize: 15,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    selectedCoords: {
+        color: COLORS.textMuted,
+        fontSize: 13,
     },
     successText: { 
         color: '#10B981', 
