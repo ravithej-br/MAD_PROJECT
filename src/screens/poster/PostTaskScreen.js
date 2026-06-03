@@ -6,13 +6,11 @@
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
-    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert,
+    ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from '../../components/MapView';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import * as ImagePicker from 'expo-image-picker';
-import { db, storage } from '../../config/firebase';
+import { db } from '../../config/firebase';
 import useAuthStore from '../../store/useAuthStore';
 import { COLORS } from '../../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -108,8 +106,6 @@ export default function PostTaskScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(1);
     const [locationError, setLocationError] = useState('');
-    const [taskImage, setTaskImage] = useState(null);
-    const [imageUploading, setImageUploading] = useState(false);
 
     // Validation Errors
     const [errors, setErrors] = useState({});
@@ -168,61 +164,6 @@ export default function PostTaskScreen({ navigation }) {
         setTaskLocation(coordinate);
     };
 
-    const pickImage = async () => {
-        try {
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Required', 'Camera roll permission needed to upload images.');
-                return;
-            }
-
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.7,
-            });
-
-            // Expo ImagePicker result shapes differ between SDKs and platforms.
-            // Guard against both `canceled` and `cancelled` flags and missing `assets`.
-            if (result && (result.canceled === false || result.cancelled === false)) {
-                const uri = result.assets && result.assets[0] ? result.assets[0].uri : result.uri;
-                if (typeof setTaskImage === 'function') {
-                    setTaskImage(uri);
-                }
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Failed to pick image: ' + error.message);
-        }
-    };
-
-    const uploadImage = async (imageUri) => {
-        try {
-            setImageUploading(true);
-            
-            // Convert image to blob
-            const response = await fetch(imageUri);
-            const blob = await response.blob();
-            
-            // Create unique filename
-            const filename = `tasks/${user.uid}/${Date.now()}.jpg`;
-            const storageRef = ref(storage, filename);
-            
-            // Upload to Firebase Storage
-            await uploadBytes(storageRef, blob);
-            
-            // Get download URL
-            const downloadURL = await getDownloadURL(storageRef);
-            setImageUploading(false);
-            
-            return downloadURL;
-        } catch (error) {
-            setImageUploading(false);
-            console.error('Image upload error:', error);
-            throw error;
-        }
-    };
-
     const handlePost = async () => {
         if (!taskLocation) {
             showAlert('No Location', 'Please set a location on the map.');
@@ -230,26 +171,12 @@ export default function PostTaskScreen({ navigation }) {
         }
         setLoading(true);
         try {
-            let imageURL = null;
-            
-            // Upload image if selected
-            if (taskImage) {
-                try {
-                    imageURL = await uploadImage(taskImage);
-                } catch (imgErr) {
-                    console.error('Image upload failed:', imgErr);
-                    // Continue even if image upload fails
-                    showAlert('Warning', 'Image upload failed, but task will be posted without image.');
-                }
-            }
-            
             console.log('Posting task with data:', {
                 title: title.trim(),
                 description: description.trim(),
                 price: parseFloat(price),
                 category,
                 location: taskLocation,
-                imageURL,
                 status: 'open',
                 posterId: user.uid,
             });
@@ -260,7 +187,6 @@ export default function PostTaskScreen({ navigation }) {
                 price: parseFloat(price),
                 category,
                 location: taskLocation,
-                imageURL,
                 status: 'open',
                 posterId: user.uid,
                 runnerId: null,
@@ -350,24 +276,6 @@ export default function PostTaskScreen({ navigation }) {
                     onChangeText={setPrice}
                 />
                 {errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
-
-                <Text style={styles.label}>📸 Add Photo (Optional)</Text>
-                <TouchableOpacity style={styles.imageUploadBtn} onPress={pickImage}>
-                    <Text style={styles.imageUploadText}>
-                        {taskImage ? '✅ Photo Added - Tap to Change' : '📷 Choose Photo'}
-                    </Text>
-                </TouchableOpacity>
-                {taskImage && (
-                    <View style={styles.imagePreview}>
-                        <Image source={{ uri: taskImage }} style={styles.previewImage} />
-                        <TouchableOpacity 
-                            style={styles.removeImageBtn}
-                            onPress={() => { if (typeof setTaskImage === 'function') setTaskImage(null); }}
-                        >
-                            <Text style={styles.removeImageText}>✕ Remove</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
 
                 <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
                     <Text style={styles.nextBtnText}>Next: Set Location →</Text>
@@ -479,12 +387,7 @@ const styles = StyleSheet.create({
     },
     backBtnText: { fontWeight: '600', color: COLORS.text },
     postBtn: { flex: 2, backgroundColor: COLORS.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
-    imageUploadBtn: {
-        backgroundColor: COLORS.card, borderRadius: 12, padding: 16,
-        borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed',
-        alignItems: 'center', marginBottom: 12,
-    },
-   
+    
     errorBarText: { 
         color: '#EF4444', 
         fontWeight: '600', 
