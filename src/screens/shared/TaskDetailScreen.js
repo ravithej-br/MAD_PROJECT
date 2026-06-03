@@ -197,6 +197,30 @@ export default function TaskDetailScreen({ route, navigation }) {
         }
     };
 
+    const cancelTask = async () => {
+        showAlert(
+            'Cancel Task?',
+            'Are you sure you want to cancel this task? This cannot be undone.',
+            [
+                { text: 'No, Keep it', style: 'cancel' },
+                {
+                    text: 'Yes, Cancel',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            await updateDoc(doc(db, 'tasks', task.id), { status: 'cancelled' });
+                            setLoading(false);
+                            setToast('Task cancelled successfully.');
+                        } catch (err) {
+                            setLoading(false);
+                            setToast('Error: ' + (err.message || 'Could not cancel task.'));
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const st = STATUS_CONFIG[task.status] || STATUS_CONFIG.open;
     const rawDist = task.runnerLocation && task.location ? getDistance(task.runnerLocation, task.location, true) : null;
@@ -290,6 +314,9 @@ export default function TaskDetailScreen({ route, navigation }) {
                                     )}
                                 </TouchableOpacity>
                             )}
+                            {role === 'poster' && task.status === 'open' && (
+                                <TouchableOpacity style={styles.cancelBtn} onPress={cancelTask}><Text style={styles.cancelBtnText}>Cancel Task</Text></TouchableOpacity>
+                            )}
                             {role === 'poster' && task.status === 'completed' && (
                                 <TouchableOpacity style={styles.approveBtn} onPress={() => updateStatus('approved')}><Text style={styles.approveBtnText}>Approve & Release Payment 💰</Text></TouchableOpacity>
                             )}
@@ -341,6 +368,8 @@ const styles = StyleSheet.create({
     rejectBtnText: { color: '#EF4444', fontWeight: '700' },
     completeBtn: { backgroundColor: COLORS.success, padding: 18, borderRadius: 16, alignItems: 'center' },
     completeBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+    cancelBtn: { backgroundColor: '#FEF2F2', padding: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FECACA', marginBottom: 12 },
+    cancelBtnText: { color: '#EF4444', fontWeight: '800', fontSize: 16 },
     approveBtn: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 16, alignItems: 'center' },
     approveBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
     ratingCard: { backgroundColor: COLORS.card, borderRadius: 20, padding: 20, ...SHADOWS.card, alignItems: 'center' },
