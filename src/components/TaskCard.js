@@ -29,6 +29,10 @@ export default function TaskCard({ task, onPress, showDistance, location }) {
         ? getDistance(location, task.location)
         : null;
 
+    const ratingStars = Array.from({ length: 5 }, (_, i) =>
+        i < (task.ratingValue || 0) ? '⭐' : '☆'
+    ).join('');
+
     return (
         <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
             {/* Top Row */}
@@ -80,7 +84,7 @@ export default function TaskCard({ task, onPress, showDistance, location }) {
             {task.hasRated && (
                 <View style={styles.ratingSection}>
                     <View style={styles.ratingBadge}>
-                        <Text style={styles.ratingText}>⭐ {task.ratingValue}</Text>
+                        <Text style={styles.ratingText}>{ratingStars}</Text>
                     </View>
                     {task.feedback ? (
                         <Text style={styles.feedbackText} numberOfLines={1}>
